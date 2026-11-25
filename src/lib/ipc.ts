@@ -1,4 +1,4 @@
-import type { CliStatus, FeatureInfo, SessionEventPayload, StartOptions } from "./types";
+import type { AppConfig, Preset, ChatItem, CliStatus, FeatureInfo, SessionEventPayload, StartOptions } from "./types";
 
 export const inTauri = (): boolean => typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
@@ -9,6 +9,20 @@ async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T
 }
 
 export const ipc = {
+  listPresets: () => invoke<Preset[]>("list_presets"),
+  getConfig: () => invoke<AppConfig>("get_config"),
+  setConfig: (config: AppConfig) => invoke<void>("set_config", { config }),
+  saveTranscript: (cliSessionId: string, items: ChatItem[]) =>
+    invoke<void>("save_transcript", { cliSessionId, json: JSON.stringify(items) }),
+  loadTranscript: async (cliSessionId: string): Promise<ChatItem[]> => {
+    const j = await invoke<string | null>("load_transcript", { cliSessionId });
+    try {
+      return j ? (JSON.parse(j) as ChatItem[]) : [];
+    } catch {
+      return [];
+    }
+  },
+  deleteTranscript: (cliSessionId: string) => invoke<void>("delete_transcript", { cliSessionId }),
   cliStatus: (overridePath?: string | null) => invoke<CliStatus>("cli_status", { overridePath: overridePath ?? null }),
   startSession: (opts: StartOptions) => invoke<string>("start_session", { opts }),
   sendMessage: (sessionId: string, text: string) => invoke<void>("send_message", { sessionId, text }),

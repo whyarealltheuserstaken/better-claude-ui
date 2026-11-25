@@ -1,12 +1,18 @@
 <script lang="ts">
   import type { SessionMeta } from "../store.svelte";
-  import type { SessionState } from "../types";
+  import type { Mode, SavedSession, SessionState } from "../types";
 
   let {
     metas,
     states,
     activeId,
     version,
+    mode,
+    recents,
+    onresume,
+    onforget,
+    onsettings,
+    onpresets,
     onselect,
     onnew,
     onclose,
@@ -15,6 +21,12 @@
     states: Record<string, SessionState>;
     activeId: string | null;
     version: string | null;
+    mode: Mode;
+    recents: SavedSession[];
+    onresume: (r: SavedSession) => void;
+    onforget: (r: SavedSession) => void;
+    onsettings: () => void;
+    onpresets: () => void;
     onselect: (id: string) => void;
     onnew: () => void;
     onclose: (id: string) => void;
@@ -23,7 +35,8 @@
 
 <aside>
   <div class="brand">BetterClaudeUI</div>
-  <button class="new" onclick={onnew}>New session</button>
+  <button class="new" onclick={onnew}>{mode === "chat" ? "New chat" : "New session"}</button>
+  {#if mode === "code"}<button class="presets" onclick={onpresets}>Agent teams…</button>{/if}
   <nav aria-label="Sessions">
     {#each metas as m (m.id)}
       {@const st = states[m.id]}
@@ -37,7 +50,21 @@
       </div>
     {/each}
   </nav>
-  <div class="foot">{version ? `Claude Code ${version}` : ""}</div>
+  {#if recents.length > 0}
+    <div class="sub">Recent</div>
+    <div class="recents">
+      {#each recents.slice(0, 12) as r (r.cli_session_id)}
+        <div class="row">
+          <button class="pick" onclick={() => onresume(r)} title={r.cwd ?? r.title}><span class="name">{r.title}</span></button>
+          <button class="x" aria-label="Forget {r.title}" onclick={() => onforget(r)}>×</button>
+        </div>
+      {/each}
+    </div>
+  {/if}
+  <div class="foot">
+    <span>{version ? `Claude Code ${version}` : ""}</span>
+    <button class="gear" onclick={onsettings} aria-label="Settings">Settings</button>
+  </div>
 </aside>
 
 <style>
@@ -63,6 +90,13 @@
     border-radius: 9px;
     padding: 8px;
     font-weight: 600;
+  }
+  .presets {
+    background: var(--raised);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    padding: 7px;
   }
   nav {
     flex: 1;
@@ -132,5 +166,28 @@
     color: var(--muted);
     font-size: 12px;
     padding: 0 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .gear {
+    background: none;
+    border: 0;
+    color: var(--muted);
+    font-size: 12px;
+  }
+  .gear:hover {
+    color: var(--text);
+  }
+  .sub {
+    color: var(--muted);
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 0 6px;
+  }
+  .recents {
+    max-height: 28vh;
+    overflow-y: auto;
   }
 </style>

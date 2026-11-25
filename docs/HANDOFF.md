@@ -1,6 +1,6 @@
 # Handoff
 
-_Last updated: 2026-11-25 · Written so a fresh Claude Code session on another machine can resume cold._
+_Last updated: 2026-11-25 (session 2) · Written so a fresh Claude Code session on another machine can resume cold._
 
 **Read order for a new session:** this file → `docs/PROGRESS.md` → `docs/superpowers/specs/2026-11-24-better-claude-ui-design.md` (approved design) → `docs/superpowers/plans/` (plans) → `docs/PROTOCOL.md` (CLI protocol facts) → `docs/ARCHITECTURE.md`.
 
@@ -56,9 +56,9 @@ What the owner asked for, in their own terms:
 | Milestone | Status |
 |---|---|
 | M0 spike (protocol) + M1 core Code mode | **Done** (see below) |
-| M2 Chat mode, session list/resume, model/mode switching | Not started |
-| M3 Tiers + settings + onboarding | Not started |
-| M4 Multi-agent presets | Not started |
+| M2 Chat mode, session list/resume, model/mode switching | **Done in PR #2** (slash-command list deferred) |
+| M3 Tiers + settings + onboarding | **Done in PR #2** |
+| M4 Multi-agent presets | **Done in PR #2**; parallelism + full Deep Research run not yet verified end to end |
 | M5 Polish, installer, screenshots, measure perf targets, v0.1.0 (Windows) | Not started |
 | M6 macOS (universal) + Linux release artifacts | Not started (CI builds/tests already pass on all three) |
 
@@ -138,7 +138,15 @@ The parser, broker and registry were written test-first with a RED run observed.
 - No model/permission-mode pickers yet (`StartOptions` already carries `model`/`permission_mode`).
 - GitHub issues/labels/project board for M2–M6: PROGRESS.md is the source of truth; epic issues may not exist yet.
 
+## 10b. Session 2 notes
+- PR #2 (branch `feat/m2-m3-chat-settings-tiers`) holds M2-M4. CI green on all platforms; locally: Rust 44+8 tests, clippy/fmt clean, `npm run check` 0 errors, 42 Vitest tests. **Its merge was blocked by the permission classifier, so it may still be open: merge it first.**
+- Not yet exercised in the real app: Chat mode, resume, pickers, onboarding, presets UI (only unit tests + CI). Run `npm run tauri dev` and click through, then re-run `node tools/e2e.mjs`.
+- `--agents` verified with the real CLI: delegation goes through the `Agent` tool; subagent events carry `parent_tool_use_id`.
+- Config lives in `<config_dir>/config.json`; transcripts in `transcripts/`; user presets in `presets/*.json`.
+- Tooling gotchas: Python is not installed; use Node for scripted edits. npm registry needs a non-restricted network.
+
 ## 11. Next steps (in order)
+0. Merge PR #2, manually click through the new features, fix what breaks.
 1. **Merge PR #1** (CI green) and tag `v0.0.1-alpha`; record release-build size/RAM in PROGRESS.md.
 2. **Tighten CSP** in `src-tauri/tauri.conf.json` (`csp` for prod, `devCsp` null) and confirm release build + E2E still pass.
 3. **M2:** model/permission-mode pickers (pass via `StartOptions`; `--model`, `--permission-mode`), session persistence + resume (`--resume`), **Chat mode** (`no_tools: true`, scratch cwd, mode switch in the header, registered as a `Feature`), slash-command list via the `initialize` control request.

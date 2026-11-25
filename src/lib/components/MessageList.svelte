@@ -3,7 +3,7 @@
   import type { ChatItem } from "../types";
   import Message from "./Message.svelte";
 
-  let { items, pageSize = 150 }: { items: ChatItem[]; pageSize?: number } = $props();
+  let { items, pageSize = 150, diffs = false }: { items: ChatItem[]; pageSize?: number; diffs?: boolean } = $props();
 
   // Long sessions render only the most recent window; older items load on demand.
   let extra = $state(0);
@@ -33,7 +33,7 @@
       <button class="earlier" onclick={() => (extra += pageSize)}>Show {Math.min(start, pageSize)} earlier messages</button>
     {/if}
     {#each visible as item (item.id)}
-      <Message {item} />
+      <Message {item} {diffs} />
     {/each}
   </div>
 </div>

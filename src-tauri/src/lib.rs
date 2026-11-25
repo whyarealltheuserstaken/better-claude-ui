@@ -1,8 +1,10 @@
 pub mod cli;
 pub mod commands;
+pub mod config;
 pub mod features;
 pub mod permissions;
 pub mod platform;
+pub mod presets;
 pub mod session;
 
 use tauri::{Manager, RunEvent};
@@ -22,6 +24,12 @@ pub fn run() {
             commands::resolve_permission,
             commands::pending_permissions,
             commands::list_features,
+            commands::list_presets,
+            commands::get_config,
+            commands::set_config,
+            commands::save_transcript,
+            commands::load_transcript,
+            commands::delete_transcript,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

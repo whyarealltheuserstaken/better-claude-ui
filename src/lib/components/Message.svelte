@@ -3,7 +3,7 @@
   import type { ChatItem } from "../types";
   import ToolCard from "./ToolCard.svelte";
 
-  let { item }: { item: ChatItem } = $props();
+  let { item, diffs = false }: { item: ChatItem; diffs?: boolean } = $props();
 </script>
 
 {#if item.kind === "user"}
@@ -14,7 +14,7 @@
     {@html renderMarkdown(item.text)}
   </div>
 {:else if item.kind === "tool"}
-  <ToolCard {item} />
+  <ToolCard {item} {diffs} />
 {:else}
   <div class="notice" data-level={item.level} role={item.level === "error" ? "alert" : "status"}>{item.text}</div>
 {/if}

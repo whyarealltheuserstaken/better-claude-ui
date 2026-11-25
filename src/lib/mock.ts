@@ -40,6 +40,21 @@ export async function mockInvoke<T>(cmd: string, args?: Record<string, unknown>)
       cli(sid, { kind: "turn_result", is_error: false, result: "done", cost_usd: 0.01, session_id: "cli-" + sid });
       return undefined as T;
     }
+    case "list_presets":
+      return [{ id: "deep-research", title: "Deep Research", description: "Mock preset", cost_note: "Costs more", agents: { researcher: { description: "r", prompt: "p" } }, system_prompt: "s", custom: false }] as T;
+    case "get_config":
+      return JSON.parse(localStorage.getItem("mock_config") ?? "null") ?? { tier: "beginner", onboarded: false, default_model: null, default_permission_mode: null, always_allow: [], extra_args: [], recents: [] } as T;
+    case "set_config":
+      localStorage.setItem("mock_config", JSON.stringify(args!.config));
+      return undefined as T;
+    case "save_transcript":
+      localStorage.setItem("mock_t_" + args!.cliSessionId, args!.json as string);
+      return undefined as T;
+    case "load_transcript":
+      return localStorage.getItem("mock_t_" + args!.cliSessionId) as T;
+    case "delete_transcript":
+      localStorage.removeItem("mock_t_" + args!.cliSessionId);
+      return undefined as T;
     case "list_features":
       return [{ id: "code", title: "Code", ui_slots: [] }] as T;
     default:

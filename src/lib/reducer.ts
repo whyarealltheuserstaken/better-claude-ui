@@ -125,3 +125,12 @@ export function addUserMessage(state: SessionState, text: string): SessionState 
 export function removePending(state: SessionState, requestId: string): SessionState {
   return { ...state, pending: state.pending.filter((p) => p.request_id !== requestId) };
 }
+
+/** Load a saved transcript into a fresh state (tools that were mid-flight are marked done). */
+export function restoreItems(state: SessionState, items: ChatItem[]): SessionState {
+  const clean = items.map((it) =>
+    it.kind === "tool" && it.status === "running" ? { ...it, status: "done" as const } : it.kind === "assistant" ? { ...it, streaming: false } : it,
+  );
+  const max = clean.reduce((m, it) => Math.max(m, Number(/^i(\d+)$/.exec(it.id)?.[1] ?? 0)), 0);
+  return { ...state, items: clean, nextId: max + 1 };
+}

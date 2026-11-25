@@ -57,3 +57,20 @@ export function truncateLines(text: string, max: number): { text: string; trunca
   if (lines.length <= max) return { text, truncated: false, total: lines.length };
   return { text: lines.slice(0, max).join("\n"), truncated: true, total: lines.length };
 }
+
+export interface DiffLine {
+  sign: "+" | "-";
+  text: string;
+}
+
+/** A simple before/after view for Edit, MultiEdit and Write inputs; null for other tools. */
+export function diffLines(name: string, input: Record<string, unknown>): DiffLine[] | null {
+  const lines = (s: unknown, sign: "+" | "-"): DiffLine[] =>
+    typeof s === "string" && s !== "" ? s.split("\n").map((text) => ({ sign, text })) : [];
+  if (name === "Edit") return [...lines(input.old_string, "-"), ...lines(input.new_string, "+")];
+  if (name === "MultiEdit" && Array.isArray(input.edits)) {
+    return input.edits.flatMap((e: Record<string, unknown>) => [...lines(e.old_string, "-"), ...lines(e.new_string, "+")]);
+  }
+  if (name === "Write") return lines(input.content, "+");
+  return null;
+}
