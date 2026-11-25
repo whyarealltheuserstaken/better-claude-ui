@@ -2,7 +2,7 @@
 
 _Last updated: 2026-11-25 (end of session 2) · Written so a fresh Claude Code session on another machine can resume cold._
 
-**Read order for a new session:** this file → `docs/PROGRESS.md` → `docs/superpowers/specs/2026-11-24-better-claude-ui-design.md` (approved design) → `docs/superpowers/plans/` (plans) → `docs/PROTOCOL.md` (CLI protocol facts) → `docs/ARCHITECTURE.md`.
+**Read order for a new session:** this file → `docs/GOALS.md` (what to build next; **v0.1.0 is gated on the in-app updater**) → `docs/PROGRESS.md` → `docs/superpowers/specs/2026-11-24-better-claude-ui-design.md` (approved design) → `docs/superpowers/plans/` (plans) → `docs/PROTOCOL.md` (CLI protocol facts) → `docs/ARCHITECTURE.md`.
 
 ---
 
@@ -51,7 +51,7 @@ What the owner asked for, in their own terms:
 
 ## 3. Current state (honest)
 
-**Feature-complete for a 0.1.0 candidate; not yet released.** Everything below is merged to `main`, CI is green on Windows, macOS and Linux, and every feature marked "real-app verified" was exercised in the actual app against the real `claude` CLI via `node tools/e2e.mjs <scenario>`.
+**Feature-complete for a 0.1.0 candidate, but NOT releasable yet: the owner gated v0.1.0 on an in-app updater (not started) plus a few more owner-chosen features (see `docs/GOALS.md`).** Do not tag or publish until those are done. Everything below is merged to `main`, CI is green on Windows, macOS and Linux, and every feature marked "real-app verified" was exercised in the actual app against the real `claude` CLI via `node tools/e2e.mjs <scenario>`.
 
 | Area | Status |
 |---|---|
@@ -67,7 +67,8 @@ What the owner asked for, in their own terms:
 | Artifact preview (sandboxed) | Real-app and release-build verified (`preview`) |
 | Voice dictation | API present in WebView2; **not tested with real speech** |
 | Continue in terminal | Windows only exercised (argument construction); macOS/Linux unverified |
-| Release workflow | Written (`.github/workflows/release.yml`), **never run** (needs a tag; publishing is the owner's call) |
+| In-app updater | **Does not exist.** Required before v0.1.0. Brief and acceptance criteria in `docs/GOALS.md` |
+| Release workflow | Written (`.github/workflows/release.yml`), **never run** (needs a tag; publishing is the owner's call; has no updater signing yet) |
 
 **Measured (Windows release build, 2026-11-25):** NSIS installer 1.74 MB, MSI 2.51 MB; Home visible in about 0.9 s from launch (including test attach); idle memory about 157 MB private across 7 processes (the app exe itself is 6 MB; the rest is WebView2), rising to about 255 MB after a real chat with a preview open. The original "under 100 MB" target is not achievable with WebView2; treat about 160 MB idle as the realistic figure (still far below Electron).
 
@@ -188,11 +189,13 @@ The parser, broker and registry were written test-first with a RED run observed.
 - E2E spend still appears in the Usage ledger (it is real spend).
 
 ## 11. Next steps (in order)
-1. **Owner decision: publish v0.1.0.** Follow `docs/RELEASING.md`: push a `v0.1.0` tag, let the workflow build a DRAFT release, test the installers, publish. Builds are unsigned (SmartScreen / Gatekeeper warnings).
+1. **Build the in-app updater first** (full brief and acceptance criteria in `docs/GOALS.md`). It needs a signing keypair that only the owner can create and store as GitHub secrets, so ask for that early. Do not start anything else for the release before this.
+1b. **Then the extra features the owner is defining** (listed in `docs/GOALS.md`; a different agent may be working on them, so check open PRs first).
+1c. **Only after 1 and 1b: publish v0.1.0** (owner decision). Follow `docs/RELEASING.md`: push a `v0.1.0` tag, let the workflow build a DRAFT release, test the installers, publish. Builds are unsigned (SmartScreen / Gatekeeper warnings).
 2. Run the installer + browser sign-in wizard steps on a clean machine or VM (never exercised end to end), and try dictation with a real microphone.
 3. Try the macOS and Linux builds on real hardware (CI only builds and tests them); verify "Continue in terminal" there.
 4. Click through the agent-teams picker and preset flows once in the real app.
-5. Ideas not built: embedded PTY terminal, in-app preset editor, notifications when a turn finishes, auto-update, code signing, a "working in background" state for background subagents (their `Agent` tool_result returns immediately), user-facing theme gallery.
+5. Ideas not built: embedded PTY terminal, in-app preset editor, notifications when a turn finishes, code signing (the updater itself is NOT optional: see item 1), a "working in background" state for background subagents (their `Agent` tool_result returns immediately), user-facing theme gallery.
 
 ## 12. Setting up on a new machine
 1. Install Node 20+, Rust (rustup, MSVC on Windows), Tauri prerequisites, git, the `claude` CLI; run `claude` once to log in.

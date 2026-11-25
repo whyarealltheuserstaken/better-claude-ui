@@ -2,7 +2,7 @@
 
 Desktop UI wrapping the `claude` CLI (Tauri v2 + Rust core + SvelteKit/Svelte 5 static UI in `src/`).
 
-**Start here:** read `docs/HANDOFF.md` (current state, next steps) and `docs/PROGRESS.md`. Design: `docs/superpowers/specs/`. Plans: `docs/superpowers/plans/`.
+**Start here:** read `docs/HANDOFF.md` (current state, next steps), `docs/GOALS.md` (the v0.1.0 release gate and what to build next) and `docs/PROGRESS.md`. Design: `docs/superpowers/specs/`. Plans: `docs/superpowers/plans/`.
 
 Conventions:
 - TDD: failing test first, at the parser/session seams (Rust) and reducers/components (Vitest).

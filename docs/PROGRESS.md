@@ -2,6 +2,11 @@
 
 Legend: [x] done · [~] in progress · [ ] todo
 
+## v0.1.0 release gate (owner decision, details in `docs/GOALS.md`)
+- [ ] **In-app updater (build this first)**: signed updates, check on launch plus manual check, release notes, progress, restart; needs owner-generated signing keys
+- [ ] A few more features, defined by the owner and built by a different agent (list in `docs/GOALS.md`, currently empty)
+- [ ] Then tag and publish v0.1.0 (see the last item of M5 below)
+
 ## M0/M1 — Foundation & core Code mode (plan: `docs/superpowers/plans/2026-11-24-m0-m1-core-foundation.md`)
 - [x] T1 Repo, scaffold, CI, docs
 - [x] T2 Spike: capture real protocol → `docs/PROTOCOL.md`
@@ -68,5 +73,5 @@ Legend: [x] done · [~] in progress · [ ] todo
 - [x] README screenshots (docs/screenshots, demo data)
 - [x] Idle RAM re-measured: ~157 MB (7 processes); the <100 MB target is not achievable with WebView2 and is retired
 - [x] Release workflow + docs/RELEASING.md written (never run)
-- [ ] Tag and publish v0.1.0 (owner decision)
+- [ ] Tag and publish v0.1.0 (owner decision; **blocked on the release gate at the top of this file**)
 - [ ] M6 macOS (universal) + Linux release artifacts
