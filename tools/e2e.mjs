@@ -80,6 +80,27 @@ try {
     await new Promise(() => {});
   }
 
+  if (scenario === "preview") {
+    await page.evaluate(async () => { const { app } = await import("/src/lib/store.svelte.ts"); app.setMode("chat"); await app.newSession(); });
+    const box = page.getByLabel("Message");
+    await box.fill("BCU-PREVIEW reply with exactly this markdown and nothing else:\n```html\n<h1 id=\"ok\">Hello preview</h1>\n<script>document.body.setAttribute('data-ran','1')</script>\n```");
+    await box.press("Enter");
+    await page.getByRole("button", { name: "Send" }).waitFor();
+    step("reply with an html block received");
+    await page.getByRole("button", { name: "Preview", exact: true }).first().click(); // real click, no force: nothing may overlap it
+    const frame = page.frameLocator('iframe[title="Preview of the code block"]');
+    const heading = await frame.locator("#ok").innerText();
+    step("preview rendered: " + heading);
+    if (heading !== "Hello preview") throw new Error("preview did not render");
+    const ran = await frame.locator("body").getAttribute("data-ran");
+    if (ran !== null) throw new Error("a script ran inside the sandboxed preview!");
+    step("embedded script did not run; sandbox=" + JSON.stringify(await page.locator('iframe[title="Preview of the code block"]').getAttribute("sandbox")));
+    await tidy();
+    console.log("E2E PREVIEW PASSED");
+    cleanup(0);
+    await new Promise(() => {});
+  }
+
   if (scenario === "projects") {
     const before = await page.evaluate(async () => { const { app } = await import("/src/lib/store.svelte.ts"); return JSON.parse(JSON.stringify(app.config.projects)); });
     let sessionId = null;

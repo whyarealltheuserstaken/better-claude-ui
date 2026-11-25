@@ -82,3 +82,31 @@ describe("MessageList", () => {
     expect(screen.getByText("m9999")).toBeTruthy();
   });
 });
+
+import Message from "./Message.svelte";
+
+describe("Message code blocks", () => {
+  const reply: ChatItem = { kind: "assistant", id: "a1", text: "Here:\n\n```html\n<h1>Hi</h1>\n```\n", streaming: false, nested: false };
+
+  test("html blocks offer Preview and Copy, and Preview reports the code", async () => {
+    const onpreview = vi.fn();
+    render(Message, { item: reply, oncopy: () => {}, onpreview });
+    await fireEvent.click(screen.getByRole("button", { name: "Preview" }));
+    expect(onpreview).toHaveBeenCalledWith("<h1>Hi</h1>\n", "html");
+  });
+
+  test("the reply Copy button is in a footer after the content, never overlaying a code block", () => {
+    const { container } = render(Message, { item: reply, oncopy: () => {} });
+    const foot = container.querySelector(".foot");
+    expect(foot).toBeTruthy();
+    expect(foot!.querySelector("button[aria-label='Copy reply']")).toBeTruthy();
+    expect(container.querySelector(".codeblock button[aria-label='Copy reply']")).toBeNull();
+    const block = container.querySelector(".codeblock")!;
+    expect(block.compareDocumentPosition(foot!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  test("non-previewable languages only get Copy", () => {
+    render(Message, { item: { ...reply, text: "```ts\nlet x = 1\n```" }, oncopy: () => {} });
+    expect(screen.queryByRole("button", { name: "Preview" })).toBeNull();
+  });
+});
