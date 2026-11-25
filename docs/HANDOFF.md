@@ -170,6 +170,11 @@ The parser, broker and registry were written test-first with a RED run observed.
 - "Continue in terminal" (`platform::terminal_launch`): Windows `cmd /C start`, macOS `osascript` (Terminal), Linux `x-terminal-emulator`. Only the Windows path has been exercised (and only its argument construction in tests: it was not launched live). macOS/Linux paths are unverified.
 - Command palette is data-driven (`palette.ts`, items built in `+page.svelte`); add actions there.
 
+## 10g. Projects and search (session 2, later)
+- Projects live in `config.projects` (validated by `projects.ts`, instructions up to 20,000 chars). They become `--append-system-prompt`; with an agent team the two are merged into ONE flag (`presets::cli_args_with`), because repeated flags may not stack. `SavedSession.project` lets resumed conversations keep their project.
+- The new "projects" Home widget is in the default list; users who already customised their widgets must enable it via Customize.
+- Search (`search.rs`) scans `<config>/transcripts/*.json` (user + assistant text only, newest first, 30 hits). Transcripts are saved at the end of each turn.
+
 ## 11. Next steps (in order)
 0. PRs #2 and #3 are merged (M2-M4 + UI polish). The owner confirmed Code and Chat work in `tauri dev`; presets, resume and Settings still deserve a manual click-through.
 1. **Merge PR #1** (CI green) and tag `v0.0.1-alpha`; record release-build size/RAM in PROGRESS.md.

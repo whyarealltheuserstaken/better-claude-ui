@@ -20,6 +20,9 @@
     onteams,
     onresume,
     onusage,
+    projects = [],
+    onproject,
+    onprojects,
   }: {
     config: AppConfig;
     usage: UsageSummary | null;
@@ -34,6 +37,9 @@
     onteams: () => void;
     onresume: (r: SavedSession) => void;
     onusage: () => void;
+    projects?: { id: string; name: string; cwd: string | null }[];
+    onproject: (id: string, mode: "chat" | "code") => void;
+    onprojects: () => void;
   } = $props();
 
   const ids = $derived(cleanWidgetList(config.home_widgets));
@@ -81,6 +87,19 @@
             <button onclick={onnewchat}>New chat</button>
             <button onclick={onteams}>Agent teams</button>
           </div>
+        {:else if id === "projects"}
+          {#if projects.length === 0}
+            <p class="empty">Projects keep instructions for ongoing work, like a tone of voice or house rules.</p>
+          {:else}
+            {#each projects.slice(0, 5) as p (p.id)}
+              <div class="prow">
+                <span class="pn">{p.name}</span>
+                <button onclick={() => onproject(p.id, "chat")}>Chat</button>
+                <button onclick={() => onproject(p.id, "code")}>Code</button>
+              </div>
+            {/each}
+          {/if}
+          <button class="link" onclick={onprojects}>{projects.length === 0 ? "Create a project" : "Manage projects"}</button>
         {:else if id === "limits"}
           {#if !limits}
             <p class="empty">Appears after your first message. Claude Code reports your plan limits with each reply.</p>
@@ -191,5 +210,8 @@
   .rec { display: flex; gap: 10px; width: 100%; text-align: left; background: none; border: 0; border-radius: var(--radius-sm); padding: 6px 4px; align-items: center; }
   .rec:hover { background: var(--raised); }
   .rec .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .prow { display: flex; gap: 8px; align-items: center; padding: 3px 0; }
+  .pn { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .prow button { padding: 2px 10px; }
   .tag { font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 0 7px; flex: none; }
 </style>

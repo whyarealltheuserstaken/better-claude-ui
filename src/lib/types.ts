@@ -77,6 +77,7 @@ export interface StartOptions {
   preset?: string | null;
   web_search?: boolean;
   effort?: string | null;
+  instructions?: string | null;
 }
 
 export type ChatItem =
@@ -124,6 +125,7 @@ export interface SavedSession {
   preset: string | null;
   effort: string | null;
   web_search: boolean;
+  project: string | null;
   updated_at: number;
 }
 
@@ -142,6 +144,7 @@ export interface AppConfig {
   budget_daily_usd: number | null;
   budget_monthly_usd: number | null;
   home_widgets: string[];
+  projects: unknown[];
 }
 
 export interface AgentDef {

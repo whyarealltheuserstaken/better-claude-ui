@@ -92,11 +92,20 @@ pub fn agents_json(p: &Preset) -> Value {
 
 /// CLI arguments that enable this preset for a session.
 pub fn cli_args(p: &Preset) -> Vec<String> {
+    cli_args_with(p, None)
+}
+
+/// Like [`cli_args`], with extra instructions (e.g. a project's) placed before the preset's own.
+pub fn cli_args_with(p: &Preset, extra: Option<&str>) -> Vec<String> {
+    let system = match extra.map(str::trim).filter(|e| !e.is_empty()) {
+        Some(e) => format!("{e}\n\n{}", p.system_prompt),
+        None => p.system_prompt.clone(),
+    };
     vec![
         "--agents".into(),
         agents_json(p).to_string(),
         "--append-system-prompt".into(),
-        p.system_prompt.clone(),
+        system,
     ]
 }
 
@@ -163,6 +172,19 @@ mod tests {
         assert!(v["coder"].get("tools").is_none());
         assert_eq!(a[2], "--append-system-prompt");
         assert_eq!(a[3], p.system_prompt);
+    }
+
+    #[test]
+    fn project_instructions_come_before_the_preset_prompt_in_one_flag() {
+        let p = builtin().remove(0);
+        let a = cli_args_with(&p, Some("Be terse."));
+        assert_eq!(
+            a.iter().filter(|x| *x == "--append-system-prompt").count(),
+            1
+        );
+        assert!(a[3].starts_with("Be terse.\n\n"));
+        assert!(a[3].ends_with(&p.system_prompt));
+        assert_eq!(cli_args_with(&p, Some("  ")), cli_args(&p));
     }
 
     #[test]

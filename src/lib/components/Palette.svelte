@@ -2,13 +2,36 @@
   import { onMount } from "svelte";
   import { filterPalette, type PaletteItem } from "../palette";
 
-  let { items, onclose }: { items: PaletteItem[]; onclose: () => void } = $props();
+  let {
+    items,
+    search,
+    onclose,
+  }: { items: PaletteItem[]; search?: (q: string) => Promise<PaletteItem[]>; onclose: () => void } = $props();
+
+  let found = $state<PaletteItem[]>([]);
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let seq = 0;
 
   let query = $state("");
   let sel = $state(0);
   let input: HTMLInputElement | undefined = $state();
 
-  const shown = $derived(filterPalette(items, query));
+  const shown = $derived([...filterPalette(items, query), ...found.filter((f) => !filterPalette(items, query).some((x) => x.id === f.id))]);
+
+  $effect(() => {
+    const q = query.trim();
+    if (timer) clearTimeout(timer);
+    if (!search || q.length < 3) {
+      found = [];
+      return;
+    }
+    const mine = ++seq;
+    timer = setTimeout(async () => {
+      const r = await search(q).catch(() => []);
+      if (mine === seq) found = r;
+    }, 250);
+    return () => timer && clearTimeout(timer);
+  });
   $effect(() => {
     void shown;
     sel = 0;

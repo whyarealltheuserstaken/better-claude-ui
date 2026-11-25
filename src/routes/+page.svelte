@@ -2,6 +2,8 @@
   import { onMount } from "svelte";
   import CapabilitiesPanel from "$lib/components/CapabilitiesPanel.svelte";
   import EditorPanel from "$lib/components/EditorPanel.svelte";
+  import ProjectsPanel from "$lib/components/ProjectsPanel.svelte";
+  import { pickFolder } from "$lib/ipc";
   import Palette from "$lib/components/Palette.svelte";
   import { allStyles, allThemes } from "$lib/theme";
   import type { PaletteItem } from "$lib/palette";
@@ -61,6 +63,7 @@
       { id: "new-chat", label: "New chat", group: "Start", run: () => { app.setMode("chat"); void app.newSession(); } },
       { id: "new-code", label: "New coding session", group: "Start", keywords: "project folder", run: () => { app.setMode("code"); void app.newSession(); } },
       { id: "teams", label: "Agent teams", group: "Start", keywords: "preset research coordinator review", run: () => (app.showPresets = true) },
+      { id: "projects", label: "Projects", group: "App", keywords: "instructions manage", run: () => (app.showProjects = true) },
       { id: "settings", label: "Settings", group: "App", keywords: "preferences appearance tier", run: () => (app.showSettings = true) },
     ];
     if (app.tier !== "beginner") {
@@ -75,6 +78,12 @@
         { id: "terminal", label: "Continue in terminal", group: "Conversation", run: () => void app.openTerminal() },
       );
     }
+    for (const p of app.projects) {
+      items.push(
+        { id: "proj-chat-" + p.id, label: `Chat in ${p.name}`, group: "Project", keywords: "new", run: () => { app.setMode("chat"); void app.newSession({ projectId: p.id }); } },
+        { id: "proj-code-" + p.id, label: `Code in ${p.name}`, group: "Project", keywords: "new coding session", run: () => { app.setMode("code"); void app.newSession({ projectId: p.id }); } },
+      );
+    }
     for (const t of [{ id: "auto", name: "Match system" }, ...allThemes(app.config.custom_themes)])
       items.push({ id: "theme-" + t.id, label: "Theme: " + t.name, group: "Theme", run: () => void app.updateConfig({ theme: t.id }) });
     for (const s of allStyles(app.config.custom_styles))
@@ -83,6 +92,14 @@
     for (const r of app.config.recents.slice(0, 30)) items.push({ id: "rec-" + r.cli_session_id, label: r.title, group: "Recent", keywords: r.cwd ?? "", run: () => void app.resume(r) });
     return items;
   });
+
+  async function searchConversations(q: string): Promise<PaletteItem[]> {
+    const hits = await ipc.searchConversations(q);
+    return hits.flatMap((h) => {
+      const r = app.config.recents.find((x) => x.cli_session_id === h.cli_session_id);
+      return r ? [{ id: "hit-" + h.cli_session_id, label: `${r.title}: ${h.snippet}`, group: "In conversation", run: () => void app.resume(r) }] : [];
+    });
+  }
 
   function onGlobalKey(e: KeyboardEvent) {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
@@ -175,6 +192,9 @@
             onteams={() => (app.showPresets = true)}
             onresume={(r) => app.resume(r)}
             onusage={() => app.go("usage")}
+            projects={app.projects}
+            onproject={(id, mode) => { app.setMode(mode); void app.newSession({ projectId: id }); }}
+            onprojects={() => (app.showProjects = true)}
           />
         </div>
       {:else if app.view === "usage"}
@@ -244,7 +264,16 @@
 {/if}
 
 {#if app.showPalette}
-  <Palette items={paletteItems} onclose={() => (app.showPalette = false)} />
+  <Palette items={paletteItems} search={searchConversations} onclose={() => (app.showPalette = false)} />
+{/if}
+{#if app.showProjects}
+  <ProjectsPanel
+    projects={app.projects}
+    onsave={(list) => app.updateConfig({ projects: list })}
+    onstart={(p, mode) => { app.showProjects = false; app.setMode(mode); void app.newSession({ projectId: p.id }); }}
+    onpick={pickFolder}
+    onclose={() => (app.showProjects = false)}
+  />
 {/if}
 {#if app.toast}<div class="toast" role="status">{app.toast}</div>{/if}
 {#if app.showCaps}
