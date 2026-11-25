@@ -86,9 +86,93 @@ pub fn build_args(o: &SessionOptions) -> Vec<String> {
     a
 }
 
+/// A file sent along with a message (images and PDFs as base64).
+#[derive(Debug, Clone, PartialEq, serde::Deserialize)]
+pub struct Attachment {
+    pub name: String,
+    pub media_type: String,
+    /// Base64 without the `data:` prefix.
+    pub data: String,
+}
+
+pub const MAX_ATTACHMENTS: usize = 10;
+/// Base64 length limit per attachment (about 7.5 MB of raw data).
+pub const MAX_ATTACHMENT_B64: usize = 10_000_000;
+pub const MAX_TOTAL_B64: usize = 28_000_000;
+const IMAGE_TYPES: [&str; 4] = ["image/png", "image/jpeg", "image/gif", "image/webp"];
+
+#[derive(Debug, thiserror::Error, PartialEq)]
+pub enum AttachmentError {
+    #[error("too many attachments (limit {MAX_ATTACHMENTS})")]
+    TooMany,
+    #[error("{0} is too large to send")]
+    TooLarge(String),
+    #[error("{0}: unsupported file type `{1}`")]
+    Unsupported(String, String),
+    #[error("{0} is not valid base64")]
+    BadData(String),
+}
+
+fn is_b64(s: &str) -> bool {
+    !s.is_empty()
+        && s.bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'+' | b'/' | b'='))
+}
+
+pub fn validate_attachments(list: &[Attachment]) -> Result<(), AttachmentError> {
+    if list.len() > MAX_ATTACHMENTS {
+        return Err(AttachmentError::TooMany);
+    }
+    let mut total = 0;
+    for a in list {
+        let ok_type =
+            IMAGE_TYPES.contains(&a.media_type.as_str()) || a.media_type == "application/pdf";
+        if !ok_type {
+            return Err(AttachmentError::Unsupported(
+                a.name.clone(),
+                a.media_type.clone(),
+            ));
+        }
+        if a.data.len() > MAX_ATTACHMENT_B64 {
+            return Err(AttachmentError::TooLarge(a.name.clone()));
+        }
+        if !is_b64(&a.data) {
+            return Err(AttachmentError::BadData(a.name.clone()));
+        }
+        total += a.data.len();
+    }
+    if total > MAX_TOTAL_B64 {
+        return Err(AttachmentError::TooLarge("the attachments together".into()));
+    }
+    Ok(())
+}
+
+/// Message content: a plain string when there are no attachments, else content blocks.
+pub fn user_turn_content(text: &str, attachments: &[Attachment]) -> Value {
+    if attachments.is_empty() {
+        return Value::String(text.to_string());
+    }
+    let mut blocks: Vec<Value> = attachments
+        .iter()
+        .map(|a| {
+            let kind = if a.media_type == "application/pdf" { "document" } else { "image" };
+            json!({"type": kind, "source": {"type":"base64","media_type": a.media_type, "data": a.data}})
+        })
+        .collect();
+    if !text.trim().is_empty() {
+        blocks.push(json!({"type":"text","text":text}));
+    }
+    Value::Array(blocks)
+}
+
 /// JSON line for a user turn.
 pub fn user_turn_line(text: &str) -> String {
-    json!({"type":"user","message":{"role":"user","content":text}}).to_string()
+    user_turn_line_with(text, &[])
+}
+
+pub fn user_turn_line_with(text: &str, attachments: &[Attachment]) -> String {
+    json!({"type":"user","message":{"role":"user","content":user_turn_content(text, attachments)}})
+        .to_string()
 }
 
 /// JSON line answering a `can_use_tool` request.
@@ -244,6 +328,17 @@ impl SessionManager {
         self.write_line(id, user_turn_line(text)).await
     }
 
+    pub async fn send_with(
+        &self,
+        id: &str,
+        text: &str,
+        attachments: &[Attachment],
+    ) -> Result<(), SessionError> {
+        validate_attachments(attachments).map_err(|e| SessionError::Write(e.to_string()))?;
+        self.write_line(id, user_turn_line_with(text, attachments))
+            .await
+    }
+
     pub async fn respond_permission(
         &self,
         id: &str,
@@ -316,6 +411,70 @@ mod tests {
         assert_eq!(a[pos("--resume") + 1], "abc");
         assert_eq!(a[pos("--tools") + 1], "");
         assert_eq!(a[pos("--add-dir") + 1], "x");
+    }
+
+    fn att(name: &str, mt: &str, data: &str) -> Attachment {
+        Attachment {
+            name: name.into(),
+            media_type: mt.into(),
+            data: data.into(),
+        }
+    }
+
+    #[test]
+    fn plain_text_turn_keeps_string_content() {
+        let v: Value = serde_json::from_str(&user_turn_line("hi")).unwrap();
+        assert_eq!(v["message"]["content"], "hi");
+    }
+
+    #[test]
+    fn attachments_become_image_document_and_text_blocks() {
+        let line = user_turn_line_with(
+            "look",
+            &[
+                att("a.png", "image/png", "AAAA"),
+                att("b.pdf", "application/pdf", "BBBB"),
+            ],
+        );
+        let v: Value = serde_json::from_str(&line).unwrap();
+        let c = v["message"]["content"].as_array().unwrap();
+        assert_eq!(c[0]["type"], "image");
+        assert_eq!(c[0]["source"]["media_type"], "image/png");
+        assert_eq!(c[1]["type"], "document");
+        assert_eq!(c[2]["type"], "text");
+        assert_eq!(c[2]["text"], "look");
+    }
+
+    #[test]
+    fn attachment_only_message_has_no_empty_text_block() {
+        let v = user_turn_content("  ", &[att("a.png", "image/png", "AAAA")]);
+        assert_eq!(v.as_array().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn validation_rejects_bad_input() {
+        assert!(validate_attachments(&[att("a.png", "image/png", "AAAA")]).is_ok());
+        assert!(matches!(
+            validate_attachments(&[att("a.exe", "application/x-msdownload", "AAAA")]),
+            Err(AttachmentError::Unsupported(..))
+        ));
+        assert!(matches!(
+            validate_attachments(&[att("a.png", "image/png", "not base64!!")]),
+            Err(AttachmentError::BadData(_))
+        ));
+        assert!(matches!(
+            validate_attachments(&[att("a.png", "image/png", "")]),
+            Err(AttachmentError::BadData(_))
+        ));
+        let big = "A".repeat(MAX_ATTACHMENT_B64 + 1);
+        assert!(matches!(
+            validate_attachments(&[att("big.png", "image/png", &big)]),
+            Err(AttachmentError::TooLarge(_))
+        ));
+        let many: Vec<_> = (0..11)
+            .map(|i| att(&format!("{i}.png"), "image/png", "AAAA"))
+            .collect();
+        assert_eq!(validate_attachments(&many), Err(AttachmentError::TooMany));
     }
 
     #[test]

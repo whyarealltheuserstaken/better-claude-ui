@@ -1,3 +1,4 @@
+import { type PendingAttachment, composeText, toWire } from "./attachments";
 import { ipc, onSessionEvent, pickFolder } from "./ipc";
 import { addUserMessage, initialState, reduce, removePending, restoreItems } from "./reducer";
 import { type Caps, capsFor, normalizeTier } from "./tier";
@@ -275,12 +276,19 @@ class AppStore {
     if (m) this.mode = m.mode;
   }
 
-  async send(text: string) {
+  async send(typed: string, attachments: PendingAttachment[] = []) {
     const id = this.activeId;
-    if (!id || !text.trim()) return;
-    this.states[id] = addUserMessage(this.states[id], text);
+    const text = composeText(typed, attachments);
+    const wire = toWire(attachments);
+    if (!id || (!text.trim() && wire.length === 0)) return;
+    // Show what the user typed (not the inlined file bodies) plus attachment chips.
+    this.states[id] = addUserMessage(
+      this.states[id],
+      typed || (attachments.length > 0 ? "(attachments)" : ""),
+      attachments.map((a) => ({ name: a.name, kind: a.kind })),
+    );
     try {
-      await ipc.sendMessage(id, text);
+      await ipc.sendMessage(id, text, wire);
     } catch (e) {
       this.error = String(e);
     }

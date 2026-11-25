@@ -243,10 +243,11 @@ pub async fn send_message(
     state: State<'_, AppState>,
     session_id: String,
     text: String,
+    attachments: Option<Vec<crate::session::Attachment>>,
 ) -> Result<(), String> {
     manager(&state)
         .await?
-        .send(&session_id, &text)
+        .send_with(&session_id, &text, &attachments.unwrap_or_default())
         .await
         .map_err(|e| e.to_string())
 }

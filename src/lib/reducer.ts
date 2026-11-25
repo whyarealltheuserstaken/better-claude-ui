@@ -117,8 +117,8 @@ export function reduce(state: SessionState, event: SessionEvent): SessionState {
   }
 }
 
-export function addUserMessage(state: SessionState, text: string): SessionState {
-  const s = pushItem(state, (id) => ({ kind: "user", id, text }));
+export function addUserMessage(state: SessionState, text: string, attachments?: { name: string; kind: string }[]): SessionState {
+  const s = pushItem(state, (id) => ({ kind: "user", id, text, ...(attachments && attachments.length > 0 ? { attachments } : {}) }));
   return { ...s, status: "running" };
 }
 
