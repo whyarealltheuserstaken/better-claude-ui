@@ -6,6 +6,7 @@
     model,
     permissionMode,
     chat,
+    models = [],
     onmodel,
     onmode,
   }: {
@@ -13,10 +14,17 @@
     model: string | null;
     permissionMode: string | null;
     chat: boolean;
+    models?: { value: string; display_name: string }[];
     onmodel: (m: string | null) => void;
     onmode: (m: string | null) => void;
   } = $props();
 
+  // Prefer the CLI's own model list; "default" means no --model flag.
+  const modelOptions = $derived(
+    models.length > 0
+      ? models.map((m) => ({ id: m.value === "default" ? "" : m.value, label: m.value === "default" ? "Default" : m.display_name }))
+      : MODELS,
+  );
   const modes = $derived(PERMISSION_MODES.filter((m) => caps.permissionModes.includes(m.id)));
 
   function pickMode(v: string) {
@@ -31,7 +39,7 @@
       <label
         >Model
         <select value={model ?? ""} onchange={(e) => onmodel(e.currentTarget.value || null)}>
-          {#each MODELS as m (m.id)}<option value={m.id}>{m.label}</option>{/each}
+          {#each modelOptions as m (m.id)}<option value={m.id}>{m.label}</option>{/each}
         </select>
       </label>
     {/if}

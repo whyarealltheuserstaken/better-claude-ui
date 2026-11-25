@@ -1,6 +1,6 @@
 // End-to-end test of the REAL app against the REAL `claude` CLI, driven over WebView2's debug port.
 // Windows: starts `npm run tauri dev` itself. Usage: node tools/e2e.mjs
-// Scenarios: `node tools/e2e.mjs` (permission flow, default) or `node tools/e2e.mjs attach` (image + text attachments in Chat).
+// Scenarios: `node tools/e2e.mjs` (permission flow, default), `attach` (image + text attachments in Chat), `caps` (slash menu, capabilities panel, CLAUDE.md editor).
 // Uses your claude login (a few cents of tokens). Exits non-zero on failure.
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, rmSync, readFileSync } from "node:fs";
@@ -50,6 +50,74 @@ try {
   await page.getByRole("heading", { name: "Home" }).waitFor();
   step("Home visible, CLI detected");
   await page.getByText(/Claude Code \d/).first().waitFor();
+
+  if (scenario === "caps") {
+    const prevTier = await page.evaluate(async (cwd) => {
+      const { app } = await import("/src/lib/store.svelte.ts");
+      const prev = app.config.tier;
+      await app.updateConfig({ tier: "intermediate" });
+      app.setMode("code");
+      await app.newSession({ cwd });
+      return prev;
+    }, work);
+    const restore = () => page.evaluate(async (t) => { const { app } = await import("/src/lib/store.svelte.ts"); await app.updateConfig({ tier: t }); }, prevTier).catch(() => {});
+    try {
+      step("code session started (tier temporarily intermediate)");
+      // Wait for the CLI's init event (it carries slash commands) via the slash menu itself.
+      const box = page.getByLabel("Message");
+      let menu = false;
+      for (let i = 0; i < 40 && !menu; i++) {
+        await box.fill("");
+        await box.fill("/rev");
+        menu = await page.getByRole("listbox", { name: "Commands" }).isVisible().catch(() => false);
+        if (!menu) await new Promise((r) => setTimeout(r, 1000));
+      }
+      if (!menu) throw new Error("slash menu never appeared");
+      const options = await page.getByRole("listbox", { name: "Commands" }).getByRole("option").allInnerTexts();
+      step(`slash menu: ${options.length} options, e.g. ` + options.slice(0, 3).join(" ; "));
+      if (!options.some((o) => o.toLowerCase().includes("review"))) throw new Error("no review command offered");
+      await box.press("Tab");
+      const filled = await box.inputValue();
+      if (!filled.startsWith("/") || !filled.endsWith(" ")) throw new Error("Tab did not complete the command: " + filled);
+      step("Tab completed to: " + filled.trim());
+      await box.fill("");
+
+      await box.fill("Reply with the single word ok.");
+      await box.press("Enter");
+      await page.getByRole("button", { name: "Send" }).waitFor();
+      step("first turn done (capabilities now reported)");
+      await page.getByRole("button", { name: "Capabilities" }).click();
+      const dlg = page.getByRole("dialog", { name: "Capabilities" });
+      await dlg.waitFor();
+      const tabsText = (await dlg.getByRole("tab").allInnerTexts()).join(" | ");
+      step("capabilities tabs: " + tabsText);
+      await dlg.getByRole("tab", { name: /Skills/ }).click();
+      const skillCount = await dlg.locator(".rows li").count();
+      step("skills listed: " + skillCount);
+      await dlg.getByRole("tab", { name: /Plugins/ }).click();
+      await dlg.getByRole("button", { name: "Show plugin details" }).click();
+      await dlg.locator("pre.out").waitFor({ timeout: 60000 });
+      step("claude plugin list output: " + (await dlg.locator("pre.out").innerText()).split("\n")[0].slice(0, 60));
+      await dlg.getByRole("button", { name: "Close" }).click();
+
+      await page.getByRole("button", { name: "Instructions and settings" }).click();
+      const ed = page.getByRole("dialog", { name: "Instructions and settings" });
+      await ed.waitFor();
+      await ed.getByRole("tab", { name: "Project instructions" }).click();
+      const ta = ed.getByLabel("Project instructions");
+      await ta.fill("# E2E marker\nAlways answer in haiku.");
+      await ed.getByRole("button", { name: "Save" }).click();
+      await ed.getByText(/Saved\./).waitFor();
+      const f = join(work, "CLAUDE.md");
+      if (!existsSync(f) || !readFileSync(f, "utf8").includes("E2E marker")) throw new Error("CLAUDE.md not written to the project");
+      step("CLAUDE.md saved in the project folder");
+    } finally {
+      await restore();
+    }
+    console.log("E2E CAPS PASSED");
+    cleanup(0);
+    await new Promise(() => {});
+  }
 
   if (scenario === "attach") {
     await page.evaluate(async () => {

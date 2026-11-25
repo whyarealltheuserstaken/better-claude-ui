@@ -13,6 +13,9 @@
     onforget,
     onsettings,
     onpresets,
+    advancedTools = false,
+    oncaps,
+    oneditor,
     onselect,
     onnew,
     onclose,
@@ -27,6 +30,9 @@
     onforget: (r: SavedSession) => void;
     onsettings: () => void;
     onpresets: () => void;
+    advancedTools?: boolean;
+    oncaps: () => void;
+    oneditor: () => void;
     onselect: (id: string) => void;
     onnew: () => void;
     onclose: (id: string) => void;
@@ -37,6 +43,10 @@
   <div class="brand">Better<span>Claude</span>UI</div>
   <button class="new" onclick={onnew}>{mode === "chat" ? "New chat" : "New session"}</button>
   {#if mode === "code"}<button class="presets" onclick={onpresets}>Agent teams</button>{/if}
+  {#if advancedTools}
+    <button class="presets" onclick={oncaps}>Capabilities</button>
+    <button class="presets" onclick={oneditor}>Instructions and settings</button>
+  {/if}
   <nav aria-label="Sessions">
     {#each metas as m (m.id)}
       {@const st = states[m.id]}

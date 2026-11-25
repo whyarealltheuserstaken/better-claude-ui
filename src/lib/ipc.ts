@@ -1,4 +1,4 @@
-import type { AppConfig, AuthStatus, LimitsSnapshot, UsageSummary, Preset, ChatItem, CliStatus, FeatureInfo, SessionEventPayload, StartOptions } from "./types";
+import type { AppConfig, AuthStatus, CliOutput, LimitsSnapshot, UsageSummary, Preset, ChatItem, CliStatus, FeatureInfo, SessionEventPayload, StartOptions } from "./types";
 
 export const inTauri = (): boolean => typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
@@ -15,6 +15,10 @@ export const ipc = {
   usageSummary: (days: number) => invoke<UsageSummary>("usage_summary", { offsetMinutes: -new Date().getTimezoneOffset(), days }),
   usageLimits: () => invoke<LimitsSnapshot | null>("usage_limits"),
   usageClear: () => invoke<void>("usage_clear"),
+  readConfigFile: (target: string, project: string | null) => invoke<string>("read_config_file", { target, project }),
+  writeConfigFile: (target: string, project: string | null, content: string) =>
+    invoke<void>("write_config_file", { target, project, content }),
+  runCli: (args: string[], cwd: string | null) => invoke<CliOutput>("run_cli", { args, cwd }),
   listPresets: () => invoke<Preset[]>("list_presets"),
   getConfig: () => invoke<AppConfig>("get_config"),
   setConfig: (config: AppConfig) => invoke<void>("set_config", { config }),

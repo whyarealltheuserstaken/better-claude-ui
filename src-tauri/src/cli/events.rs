@@ -17,6 +17,48 @@ pub struct ModelUsage {
     pub cost_usd: f64,
 }
 
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+pub struct Described {
+    pub name: String,
+    pub description: String,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+pub struct ModelInfo {
+    /// Value to pass to `--model`.
+    pub value: String,
+    pub display_name: String,
+    pub description: String,
+}
+
+/// Answer to the `initialize` control request: available before the first message.
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+pub struct InitInfo {
+    pub commands: Vec<Described>,
+    pub agents: Vec<Described>,
+    pub models: Vec<ModelInfo>,
+    pub output_styles: Vec<String>,
+    pub version: String,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+pub struct McpServer {
+    pub name: String,
+    pub status: String,
+}
+
+/// What this session can do, from the `init` event.
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+pub struct Capabilities {
+    pub slash_commands: Vec<String>,
+    pub skills: Vec<String>,
+    pub agents: Vec<String>,
+    pub tools: Vec<String>,
+    pub mcp_servers: Vec<McpServer>,
+    pub plugins: Vec<String>,
+    pub version: String,
+}
+
 /// One subscription usage window from a `rate_limit_event` (e.g. `five_hour`, `seven_day`).
 #[derive(Debug, Clone, PartialEq, Serialize, serde::Deserialize)]
 pub struct RateWindow {
@@ -51,6 +93,7 @@ pub enum Event {
         session_id: String,
         model: String,
         cwd: String,
+        caps: Box<Capabilities>,
     },
     TextDelta {
         text: String,
@@ -90,6 +133,10 @@ pub enum Event {
         num_turns: Option<u64>,
         /// Cumulative per-model usage for the session process.
         models: Vec<ModelUsage>,
+    },
+    /// Reply to the initialize control request.
+    Initialized {
+        info: Box<InitInfo>,
     },
     /// Subscription usage windows and overage state.
     RateLimit {
@@ -160,6 +207,7 @@ fn interpret(v: Value) -> Vec<Event> {
                     session_id: s(&v, "session_id"),
                     model: s(&v, "model"),
                     cwd: s(&v, "cwd"),
+                    caps: Box::new(parse_caps(&v)),
                 }],
                 "permission_denied" => vec![Event::PermissionDenied {
                     tool: s(&v, "tool_name"),
@@ -277,7 +325,124 @@ fn interpret(v: Value) -> Vec<Event> {
             models: parse_model_usage(&v),
         }],
         "rate_limit_event" => vec![parse_rate_limit(&v)],
+        "control_response" => parse_initialized(&v).map_or_else(
+            || {
+                vec![Event::Info {
+                    subtype: "control_response".into(),
+                }]
+            },
+            |info| {
+                vec![Event::Initialized {
+                    info: Box::new(info),
+                }]
+            },
+        ),
         _ => vec![Event::Unknown { raw: v }],
+    }
+}
+
+fn described(v: &Value, key: &str) -> Vec<Described> {
+    v.get(key)
+        .and_then(Value::as_array)
+        .map(|a| {
+            a.iter()
+                .filter_map(|x| {
+                    Some(Described {
+                        name: x.get("name")?.as_str()?.to_string(),
+                        description: x
+                            .get("description")
+                            .and_then(Value::as_str)
+                            .unwrap_or("")
+                            .to_string(),
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Parse a successful `initialize` reply; None for any other control response.
+fn parse_initialized(v: &Value) -> Option<InitInfo> {
+    let r = v.get("response")?;
+    if r.get("subtype")?.as_str()? != "success" {
+        return None;
+    }
+    let body = r.get("response")?;
+    body.get("commands")?;
+    let models = body
+        .get("models")
+        .and_then(Value::as_array)
+        .map(|a| {
+            a.iter()
+                .filter_map(|m| {
+                    let value = m.get("value")?.as_str()?.to_string();
+                    Some(ModelInfo {
+                        display_name: m
+                            .get("displayName")
+                            .and_then(Value::as_str)
+                            .unwrap_or(&value)
+                            .to_string(),
+                        description: m
+                            .get("description")
+                            .and_then(Value::as_str)
+                            .unwrap_or("")
+                            .to_string(),
+                        value,
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    Some(InitInfo {
+        commands: described(body, "commands"),
+        agents: described(body, "agents"),
+        models,
+        output_styles: str_list(body, "available_output_styles"),
+        version: s(body, "claude_code_version"),
+    })
+}
+
+fn str_list(v: &Value, key: &str) -> Vec<String> {
+    v.get(key)
+        .and_then(Value::as_array)
+        .map(|a| {
+            a.iter()
+                .filter_map(|x| x.as_str().map(String::from))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn parse_caps(v: &Value) -> Capabilities {
+    let named = |key: &str| -> Vec<(String, String)> {
+        v.get(key)
+            .and_then(Value::as_array)
+            .map(|a| {
+                a.iter()
+                    .filter_map(|x| {
+                        let name = x.get("name")?.as_str()?.to_string();
+                        let status = x
+                            .get("status")
+                            .and_then(Value::as_str)
+                            .unwrap_or("")
+                            .to_string();
+                        Some((name, status))
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
+    };
+    Capabilities {
+        slash_commands: str_list(v, "slash_commands"),
+        skills: str_list(v, "skills"),
+        agents: str_list(v, "agents"),
+        tools: str_list(v, "tools"),
+        mcp_servers: named("mcp_servers")
+            .into_iter()
+            .map(|(name, status)| McpServer { name, status })
+            .collect(),
+        plugins: named("plugins").into_iter().map(|(n, _)| n).collect(),
+        version: s(v, "claude_code_version"),
     }
 }
 
@@ -360,6 +525,7 @@ mod tests {
                 session_id,
                 model,
                 cwd,
+                ..
             } => Some((session_id, model, cwd)),
             _ => None,
         });
@@ -573,6 +739,71 @@ mod tests {
         assert!(matches!(
             parse_line(line).unwrap().remove(0),
             Event::RateLimit { .. }
+        ));
+    }
+
+    #[test]
+    fn init_event_exposes_capabilities() {
+        let line = r#"{"type":"system","subtype":"init","session_id":"s","model":"m","cwd":"c","claude_code_version":"2.1.332","slash_commands":["review","ecc:plan"],"skills":["a:b"],"agents":["claude"],"tools":["Bash","Read"],"mcp_servers":[{"name":"gh","status":"connected"},{"name":"x"}],"plugins":[{"name":"superpowers","path":"p"}]}"#;
+        match parse_line(line).unwrap().remove(0) {
+            Event::SessionInit { caps, .. } => {
+                assert_eq!(caps.slash_commands, vec!["review", "ecc:plan"]);
+                assert_eq!(caps.tools.len(), 2);
+                assert_eq!(
+                    caps.mcp_servers[0],
+                    McpServer {
+                        name: "gh".into(),
+                        status: "connected".into()
+                    }
+                );
+                assert_eq!(caps.mcp_servers[1].status, "");
+                assert_eq!(caps.plugins, vec!["superpowers"]);
+                assert_eq!(caps.version, "2.1.332");
+            }
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+
+    #[test]
+    fn init_without_capability_fields_still_parses() {
+        let line = r#"{"type":"system","subtype":"init","session_id":"s","model":"m","cwd":"c"}"#;
+        match parse_line(line).unwrap().remove(0) {
+            Event::SessionInit { caps, .. } => assert_eq!(*caps, Capabilities::default()),
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+
+    #[test]
+    fn initialize_response_gives_commands_models_and_agents() {
+        let line = r#"{"type":"control_response","response":{"subtype":"success","request_id":"bcu-init","response":{"commands":[{"name":"review","description":"Review a PR"},{"name":"init"}],"agents":[{"name":"claude","description":"General"}],"models":[{"value":"default","displayName":"Default (recommended)","description":"Opus"},{"value":"sonnet"}],"available_output_styles":["default","Concise"],"claude_code_version":"2.1.332","account":{"email":"x@y.z"}}}}"#;
+        match parse_line(line).unwrap().remove(0) {
+            Event::Initialized { info } => {
+                assert_eq!(info.commands.len(), 2);
+                assert_eq!(info.commands[0].description, "Review a PR");
+                assert_eq!(info.commands[1].description, "");
+                assert_eq!(info.agents[0].name, "claude");
+                assert_eq!(info.models[0].display_name, "Default (recommended)");
+                assert_eq!(info.models[1].display_name, "sonnet");
+                assert_eq!(info.output_styles, vec!["default", "Concise"]);
+                assert_eq!(info.version, "2.1.332");
+                // The account email must never be carried into events.
+                assert!(!format!("{info:?}").contains("x@y.z"));
+            }
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+
+    #[test]
+    fn other_control_responses_are_info_not_initialized() {
+        let line = r#"{"type":"control_response","response":{"subtype":"success","request_id":"int-1","response":{}}}"#;
+        assert!(matches!(
+            parse_line(line).unwrap().remove(0),
+            Event::Info { .. }
+        ));
+        let err = r#"{"type":"control_response","response":{"subtype":"error","request_id":"x","error":"no"}}"#;
+        assert!(matches!(
+            parse_line(err).unwrap().remove(0),
+            Event::Info { .. }
         ));
     }
 }

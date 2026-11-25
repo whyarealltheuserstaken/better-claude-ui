@@ -158,6 +158,12 @@ The parser, broker and registry were written test-first with a RED run observed.
 - **Deep Research finding:** background subagents return their `Agent` tool_result immediately (~0.6 s after launch) while still working, so a delegation card shows "done" early. They do run concurrently. Consider a "working in background" state.
 - Python is not installed; use Node. The Bash tool breaks on heredocs containing apostrophes, so write scripts with the Write tool.
 
+## 10e. Capabilities, slash commands, editors (session 2, later)
+- **Protocol facts (verified):** `system/init` is emitted only with the FIRST turn. The `initialize` control request (`{"type":"control_request","request_id":"bcu-init","request":{"subtype":"initialize"}}`) works before any message and returns `commands` (with descriptions), `agents`, `models` (value/displayName), `available_output_styles`, version and the account (we deliberately drop the account/email). `SessionManager::start` now sends it automatically; the reply becomes `Event::Initialized`. `init` (first turn) additionally carries skills, tools, MCP server status and plugins (`Event::SessionInit.caps`).
+- `files.rs` edits only four fixed targets (user/project CLAUDE.md and settings.json), validates settings JSON, writes a `.bak`. `run_cli` runs only allow-listed `claude` subcommands (`mcp list|get|add|remove`, `plugin list`) with no shell. MCP form input is validated in `mcp.ts` (names cannot start with `-`).
+- Tauri `dragDropEnabled` is false so HTML5 file drops reach the page.
+- E2E: `node tools/e2e.mjs [attach|caps]`. The `caps` scenario temporarily sets your tier to Intermediate and restores it.
+
 ## 11. Next steps (in order)
 0. PRs #2 and #3 are merged (M2-M4 + UI polish). The owner confirmed Code and Chat work in `tauri dev`; presets, resume and Settings still deserve a manual click-through.
 1. **Merge PR #1** (CI green) and tag `v0.0.1-alpha`; record release-build size/RAM in PROGRESS.md.

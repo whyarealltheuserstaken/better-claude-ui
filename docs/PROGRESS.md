@@ -43,7 +43,10 @@ Legend: [x] done · [~] in progress · [ ] todo
 - [x] Usage ledger (per-turn deltas, JSONL), subscription limit windows (5-hour / weekly) from `rate_limit_event`, daily/monthly budgets
 - [x] Home page with configurable widgets (9), Usage page (ranges, per model/project, CSV copy, billing links)
 - [x] Attachments: images, PDFs, text/code files (paste, drop, or +). Verified in the real app with the real CLI (`node tools/e2e.mjs attach`)
-- [ ] Slash commands, MCP / skills / plugins panels, CLAUDE.md and settings.json editors
+- [x] Slash-command menu with descriptions (before the first message), real model list from the CLI
+- [x] Capabilities panel: MCP servers (status, add, remove, health), skills, agents, plugins, tools
+- [x] Instructions and settings editors: project/user CLAUDE.md, project/user settings.json (Advanced), JSON-validated with .bak backups
+- Verified in the real app: `node tools/e2e.mjs caps`
 - [ ] Projects (named instructions + folder), conversation search, artifact preview, voice dictation
 - [ ] Embedded terminal fallback (Advanced)
 

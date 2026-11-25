@@ -186,6 +186,12 @@ pub fn permission_reply_line(request_id: &str, reply: &PermissionReply) -> Strin
     json!({"type":"control_response","response":{"subtype":"success","request_id":request_id,"response":response}}).to_string()
 }
 
+/// JSON line asking the CLI for its commands, agents and models (works before the first turn).
+pub fn initialize_line(request_id: &str) -> String {
+    json!({"type":"control_request","request_id":request_id,"request":{"subtype":"initialize"}})
+        .to_string()
+}
+
 /// JSON line asking the CLI to interrupt the current turn.
 pub fn interrupt_line(request_id: &str) -> String {
     json!({"type":"control_request","request_id":request_id,"request":{"subtype":"interrupt"}})
@@ -301,6 +307,8 @@ impl SessionManager {
                 let _ = tx.send((sid.clone(), SessionEvent::Stderr { text }));
             }
         });
+        // Ask for commands/models up front so menus work before the first message.
+        let _ = self.write_line(&id, initialize_line("bcu-init")).await;
         Ok(id)
     }
 

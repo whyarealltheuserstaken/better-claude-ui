@@ -5,6 +5,7 @@ use crate::cli::events::Event;
 use crate::cli::setup::{self, AuthStatus};
 use crate::config::{self, AppConfig};
 use crate::features::{FeatureInfo, builtin_registry};
+use crate::files;
 use crate::permissions::{Decision, PendingPermission, PermissionBroker};
 use crate::platform;
 use crate::presets::{self, Preset};
@@ -448,4 +449,66 @@ pub fn usage_limits() -> Option<LimitsSnapshot> {
 #[tauri::command]
 pub fn usage_clear() -> Result<(), String> {
     usage::clear(&platform::config_dir()).map_err(|e| e.to_string())
+}
+
+fn config_target(
+    target: &str,
+    project: Option<String>,
+) -> Result<(files::Target, PathBuf), String> {
+    let t =
+        files::Target::parse(target).ok_or_else(|| files::FileError::UnknownTarget.to_string())?;
+    let home = platform::home().ok_or_else(|| "could not find your home folder".to_string())?;
+    let proj = project.map(PathBuf::from);
+    let path = files::resolve(t, &home, proj.as_deref()).map_err(|e| e.to_string())?;
+    Ok((t, path))
+}
+
+/// Read one of the four editable Claude Code files (empty text if it does not exist yet).
+#[tauri::command]
+pub fn read_config_file(target: String, project: Option<String>) -> Result<String, String> {
+    let (_, path) = config_target(&target, project)?;
+    files::read(&path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn write_config_file(
+    target: String,
+    project: Option<String>,
+    content: String,
+) -> Result<(), String> {
+    let (t, path) = config_target(&target, project)?;
+    files::write(t, &path, &content).map_err(|e| e.to_string())
+}
+
+#[derive(Serialize)]
+pub struct CliOutput {
+    code: Option<i32>,
+    output: String,
+}
+
+/// Run an allow-listed `claude` management command (MCP servers, plugin list).
+#[tauri::command]
+pub async fn run_cli(args: Vec<String>, cwd: Option<String>) -> Result<CliOutput, String> {
+    if !setup::is_allowed_cli_args(&args) {
+        return Err("that command is not available from the app".into());
+    }
+    let CliStatus::Found { path, .. } = tokio::task::spawn_blocking(|| detect::detect(None))
+        .await
+        .map_err(|e| e.to_string())?
+    else {
+        return Err("claude is not installed".into());
+    };
+    let mut cmd = Command::new(path);
+    cmd.args(&args);
+    if let Some(c) = cwd.filter(|c| PathBuf::from(c).is_dir()) {
+        cmd.current_dir(c);
+    }
+    let lines = Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+    let sink = lines.clone();
+    let run = setup::run_streaming(cmd, move |l| sink.lock().unwrap().push(l));
+    let code = tokio::time::timeout(std::time::Duration::from_secs(90), run)
+        .await
+        .map_err(|_| "the command took too long".to_string())??;
+    let output = lines.lock().unwrap().join("\n");
+    Ok(CliOutput { code, output })
 }

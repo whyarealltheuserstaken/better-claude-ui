@@ -1,5 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import CapabilitiesPanel from "$lib/components/CapabilitiesPanel.svelte";
+  import EditorPanel from "$lib/components/EditorPanel.svelte";
   import HomePage from "$lib/components/HomePage.svelte";
   import UsagePage from "$lib/components/UsagePage.svelte";
   import { ipc, openUrl } from "$lib/ipc";
@@ -79,6 +81,9 @@
       onforget={(r) => app.forget(r)}
       onsettings={() => (app.showSettings = true)}
       onpresets={() => (app.showPresets = true)}
+      advancedTools={app.tier !== "beginner"}
+      oncaps={() => (app.showCaps = true)}
+      oneditor={() => (app.showEditor = true)}
       onselect={(id) => app.select(id)}
       onnew={() => app.newSession()}
       onclose={(id) => app.close(id)}
@@ -161,11 +166,12 @@
                 model={app.activeMeta.model}
                 permissionMode={app.activeMeta.permissionMode}
                 chat={app.activeMeta.mode === "chat"}
+                models={active.info?.models ?? []}
                 onmodel={(m) => app.reconfigure(app.activeMeta!.id, { model: m })}
                 onmode={(m) => app.reconfigure(app.activeMeta!.id, { permissionMode: m })}
               />
             {/if}
-            <Composer status={active.status} {glyph} onsend={(t, a) => app.send(t, a)} oninterrupt={() => app.interrupt()} />
+            <Composer status={active.status} {glyph} commands={active.info ? active.info.commands.map((c) => c.name) : (active.caps?.slash_commands ?? [])} descriptions={Object.fromEntries((active.info?.commands ?? []).map((c) => [c.name, c.description]))} onsend={(t, a) => app.send(t, a)} oninterrupt={() => app.interrupt()} />
             {#if app.caps.rawLog}<RawLog events={active.raw} />{/if}
           </div>
         </div>
@@ -186,6 +192,12 @@
   </div>
 {/if}
 
+{#if app.showCaps}
+  <CapabilitiesPanel caps={app.active?.caps ?? null} run={(a) => ipc.runCli(a, app.activeMeta?.cwd ?? null)} onclose={() => (app.showCaps = false)} />
+{/if}
+{#if app.showEditor}
+  <EditorPanel project={app.activeMeta?.mode === "code" ? (app.activeMeta.cwd ?? null) : null} advanced={app.tier === "advanced"} onclose={() => (app.showEditor = false)} />
+{/if}
 {#if app.showPresets}
   <PresetPicker presets={app.presets} advanced={app.tier === "advanced"} onstart={(p) => app.startPreset(p)} onclose={() => (app.showPresets = false)} />
 {/if}
