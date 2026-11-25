@@ -7,7 +7,12 @@
 </script>
 
 {#if item.kind === "user"}
-  <div class="user"><p>{item.text}</p></div>
+  <div class="user">
+    <p>{item.text}</p>
+    {#if item.attachments && item.attachments.length > 0}
+      <div class="atts">{#each item.attachments as a}<span class="att">{a.kind === "image" ? "Image" : a.kind === "pdf" ? "PDF" : "File"}: {a.name}</span>{/each}</div>
+    {/if}
+  </div>
 {:else if item.kind === "assistant"}
   <div class="assistant md" class:nested={item.nested} class:streaming={item.streaming}>
     <!-- eslint-disable-next-line svelte/no-at-html-tags -- markdown-it runs with html:false -->
@@ -88,4 +93,6 @@
   }
   .user { margin-top: calc(26px * var(--density)); }
   .assistant { margin: calc(10px * var(--density)) 0; }
+  .atts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .att { font-size: 12px; font-weight: 400; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 0 8px; }
 </style>

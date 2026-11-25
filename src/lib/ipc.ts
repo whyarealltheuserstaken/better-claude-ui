@@ -31,7 +31,8 @@ export const ipc = {
   deleteTranscript: (cliSessionId: string) => invoke<void>("delete_transcript", { cliSessionId }),
   cliStatus: (overridePath?: string | null) => invoke<CliStatus>("cli_status", { overridePath: overridePath ?? null }),
   startSession: (opts: StartOptions) => invoke<string>("start_session", { opts }),
-  sendMessage: (sessionId: string, text: string) => invoke<void>("send_message", { sessionId, text }),
+  sendMessage: (sessionId: string, text: string, attachments: { name: string; media_type: string; data: string }[] = []) =>
+    invoke<void>("send_message", { sessionId, text, attachments }),
   interrupt: (sessionId: string) => invoke<void>("interrupt", { sessionId }),
   stopSession: (sessionId: string) => invoke<void>("stop_session", { sessionId }),
   resolvePermission: (requestId: string, decision: "allow" | "allow_always" | "deny", reason?: string) =>

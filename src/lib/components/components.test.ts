@@ -57,7 +57,7 @@ describe("Composer", () => {
     await fireEvent.keyDown(box, { key: "Enter", shiftKey: true });
     expect(onsend).not.toHaveBeenCalled();
     await fireEvent.keyDown(box, { key: "Enter" });
-    expect(onsend).toHaveBeenCalledWith("hi");
+    expect(onsend).toHaveBeenCalledWith("hi", []);
   });
 
   test("is disabled once the session has exited", () => {

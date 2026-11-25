@@ -1,11 +1,15 @@
 // End-to-end test of the REAL app against the REAL `claude` CLI, driven over WebView2's debug port.
 // Windows: starts `npm run tauri dev` itself. Usage: node tools/e2e.mjs
+// Scenarios: `node tools/e2e.mjs` (permission flow, default) or `node tools/e2e.mjs attach` (image + text attachments in Chat).
 // Uses your claude login (a few cents of tokens). Exits non-zero on failure.
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium } from "playwright-core";
+import { solidPng } from "./png.mjs";
+
+const scenario = process.argv[2] ?? "basic";
 
 const PORT = Number(process.env.E2E_PORT ?? 9477);
 const work = join(tmpdir(), "bcu-e2e-work");
@@ -43,9 +47,34 @@ try {
   page.setDefaultTimeout(90_000);
   step("attached to app window");
 
-  await page.getByText("What are we working on?").waitFor();
-  step("empty state visible, CLI detected");
-  await page.getByText(/Claude Code \d/).waitFor();
+  await page.getByRole("heading", { name: "Home" }).waitFor();
+  step("Home visible, CLI detected");
+  await page.getByText(/Claude Code \d/).first().waitFor();
+
+  if (scenario === "attach") {
+    await page.evaluate(async () => {
+      const { app } = await import("/src/lib/store.svelte.ts");
+      app.setMode("chat");
+      await app.newSession();
+    });
+    step("chat session started");
+    await page.locator('input[type=file]').setInputFiles([
+      { name: "red.png", mimeType: "image/png", buffer: solidPng([255, 0, 0]) },
+      { name: "notes.txt", mimeType: "text/plain", buffer: Buffer.from("The secret word is PINEAPPLE.") },
+    ]);
+    await page.getByRole("list", { name: "Attachments" }).waitFor();
+    step("2 attachment chips shown");
+    const m = page.getByLabel("Message");
+    await m.fill("What color is the attached image, and what is the secret word in the attached file? Reply exactly as: COLOR / WORD");
+    await m.press("Enter");
+    await page.getByRole("button", { name: "Send" }).waitFor();
+    const reply = (await page.locator(".assistant").last().innerText()).toLowerCase();
+    step(`reply: ${reply.trim()}`);
+    if (!reply.includes("red") || !reply.includes("pineapple")) throw new Error("model did not see both attachments");
+    console.log("E2E ATTACH PASSED");
+    cleanup(0);
+    await new Promise(() => {});
+  }
 
   // Start a session in a scratch folder (bypasses the native folder dialog).
   await page.evaluate(async (cwd) => {

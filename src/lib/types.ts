@@ -77,7 +77,7 @@ export interface StartOptions {
 }
 
 export type ChatItem =
-  | { kind: "user"; id: string; text: string }
+  | { kind: "user"; id: string; text: string; attachments?: { name: string; kind: string }[] }
   | { kind: "assistant"; id: string; text: string; streaming: boolean; nested: boolean }
   | {
       kind: "tool";

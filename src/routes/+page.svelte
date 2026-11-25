@@ -165,7 +165,7 @@
                 onmode={(m) => app.reconfigure(app.activeMeta!.id, { permissionMode: m })}
               />
             {/if}
-            <Composer status={active.status} {glyph} onsend={(t) => app.send(t)} oninterrupt={() => app.interrupt()} />
+            <Composer status={active.status} {glyph} onsend={(t, a) => app.send(t, a)} oninterrupt={() => app.interrupt()} />
             {#if app.caps.rawLog}<RawLog events={active.raw} />{/if}
           </div>
         </div>
