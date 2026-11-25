@@ -1,6 +1,6 @@
 # Handoff
 
-_Last updated: 2026-11-25 (session 2) · Written so a fresh Claude Code session on another machine can resume cold._
+_Last updated: 2026-11-25 (end of session 2) · Written so a fresh Claude Code session on another machine can resume cold._
 
 **Read order for a new session:** this file → `docs/PROGRESS.md` → `docs/superpowers/specs/2026-11-24-better-claude-ui-design.md` (approved design) → `docs/superpowers/plans/` (plans) → `docs/PROTOCOL.md` (CLI protocol facts) → `docs/ARCHITECTURE.md`.
 
@@ -51,26 +51,27 @@ What the owner asked for, in their own terms:
 
 ## 3. Current state (honest)
 
-**Not finished.** Milestones M0 and M1 (foundation + core Code mode) are done and verified. M2–M6 are **not started**:
+**Feature-complete for a 0.1.0 candidate; not yet released.** Everything below is merged to `main`, CI is green on Windows, macOS and Linux, and every feature marked "real-app verified" was exercised in the actual app against the real `claude` CLI via `node tools/e2e.mjs <scenario>`.
 
-| Milestone | Status |
+| Area | Status |
 |---|---|
-| M0 spike (protocol) + M1 core Code mode | **Done** (see below) |
-| M2 Chat mode, session list/resume, model/mode switching | **Done in PR #2** (slash-command list deferred) |
-| M3 Tiers + settings + onboarding | **Done in PR #2** |
-| M4 Multi-agent presets | **Done in PR #2**; parallelism + full Deep Research run not yet verified end to end |
-| M5 Polish, installer, screenshots, measure perf targets, v0.1.0 (Windows) | Not started |
-| M6 macOS (universal) + Linux release artifacts | Not started (CI builds/tests already pass on all three) |
+| Code mode (streaming, tool cards, permission gate, interrupt, diffs, resume) | Real-app verified (`basic`) |
+| Chat mode, truly tool-free incl. MCP; optional web search | Real-app verified (`chat`) |
+| Attachments (images, PDFs, text) | Real-app verified (`attach`) |
+| Slash menu, Capabilities (MCP/skills/agents/plugins/tools), CLAUDE.md + settings.json editors | Real-app verified (`caps`) |
+| Projects, conversation search, Ctrl+K palette, export, effort picker | Real-app verified (`projects`, `chat`) |
+| Usage ledger, plan-allowance meters, budgets, Home widgets, Usage page | Unit-tested + screenshot-reviewed; real numbers flow from the CLI |
+| Setup wizard (detect CLI, sign-in state) | `auth_status` verified vs the real CLI; **install and browser sign-in flows never run end to end** |
+| Themes (8) and styles (4) with editors, import/export | Unit-tested + screenshot-reviewed |
+| Agent teams: Coordinator, Deep Research, Code+Review | Deep Research run end to end on the real CLI (`tools/preset-smoke.mjs`); UI picker not click-tested |
+| Artifact preview (sandboxed) | Real-app and release-build verified (`preview`) |
+| Voice dictation | API present in WebView2; **not tested with real speech** |
+| Continue in terminal | Windows only exercised (argument construction); macOS/Linux unverified |
+| Release workflow | Written (`.github/workflows/release.yml`), **never run** (needs a tag; publishing is the owner's call) |
 
-**What works today (Windows, verified):** launch app → detects `claude` (shows version) → choose folder → starts a real session → streams replies with markdown + code highlighting → tool calls as collapsible cards with plain-language summaries → permission prompts (Allow / Always allow `<tool>` / Deny) answered over the CLI's control protocol → interrupt (Esc/Stop) → multiple sessions in sidebar → setup screen when the CLI is missing/unusable → kills all child processes on exit.
+**Measured (Windows release build, 2026-11-25):** NSIS installer 1.74 MB, MSI 2.51 MB; Home visible in about 0.9 s from launch (including test attach); idle memory about 157 MB private across 7 processes (the app exe itself is 6 MB; the rest is WebView2), rising to about 255 MB after a real chat with a preview open. The original "under 100 MB" target is not achievable with WebView2; treat about 160 MB idle as the realistic figure (still far below Electron).
 
-**Verification evidence (all run this session):**
-- Rust: 42 tests (34 unit + 8 integration against `fake-claude`), clippy `-D warnings` clean, fmt clean.
-- UI: 34 Vitest tests pass; `npm run check` 0 errors.
-- Real CLI smoke tests (`--ignored`): simple prompt streams "pong"; permission **deny** blocks the write; **interrupt** ends the turn in ~57 ms.
-- Full app E2E (`node tools/e2e.mjs`): real app + real Claude, driven over WebView2 debug port: permission prompt appears, Allow clicked, file created with expected content, 3 tool cards rendered. PASSED.
-- CI (GitHub Actions) green on windows-latest, macos-latest, ubuntu-latest, and UI job (PR #1).
-- **Release build (Windows, measured 2026-11-25):** NSIS installer **1.57 MB**, MSI 2.28 MB, `better-claude-ui.exe` 4.7 MB; main window visible in **0.39 s**; idle memory with 7 processes (app + WebView2 helpers) = **~147 MB private** (main exe alone 26 MB; the naive working-set sum of 342 MB double-counts shared pages). So size and startup beat the targets, but **idle RAM misses the <100 MB target** because WebView2 itself has a floor. Recommendation: relax the target to ≲150 MB (still far below Electron) unless M5 finds savings (e.g. avoid loading highlight.js languages eagerly, trim UI work at idle).
+**Tests:** Rust 84 unit + 8 integration, clippy `-D warnings` and fmt clean; UI 114 Vitest tests, `npm run check` 0 errors; 7 real-app E2E scenarios (`basic`, `attach`, `caps`, `chat`, `projects`, `preview`, `probe`).
 
 ## 4. How to build, run, test
 
@@ -187,13 +188,11 @@ The parser, broker and registry were written test-first with a RED run observed.
 - E2E spend still appears in the Usage ledger (it is real spend).
 
 ## 11. Next steps (in order)
-0. PRs #2 and #3 are merged (M2-M4 + UI polish). The owner confirmed Code and Chat work in `tauri dev`; presets, resume and Settings still deserve a manual click-through.
-1. **Merge PR #1** (CI green) and tag `v0.0.1-alpha`; record release-build size/RAM in PROGRESS.md.
-2. ~~Tighten CSP~~ done (ADR 0002); release build smoke-tested under it.
-3. **M2:** model/permission-mode pickers (pass via `StartOptions`; `--model`, `--permission-mode`), session persistence + resume (`--resume`), **Chat mode** (`no_tools: true`, scratch cwd, mode switch in the header, registered as a `Feature`), slash-command list via the `initialize` control request.
-4. **M3:** settings store (`platform::config_dir()`), tier switch (Beginner/Intermediate/Advanced) gating UI per design §8, onboarding, persisted always-allow rules, diff viewer for Edit/Write.
-5. **M4:** presets as data files → generate `--agents` JSON + appended system prompt; **first verify** parallel subagents and event attribution against the real CLI; Deep Research must write a cited report file.
-6. **M5/M6:** polish, installer, README screenshots, perf measurements vs targets, release workflow producing Windows + macOS universal + Linux artifacts, signing notes.
+1. **Owner decision: publish v0.1.0.** Follow `docs/RELEASING.md`: push a `v0.1.0` tag, let the workflow build a DRAFT release, test the installers, publish. Builds are unsigned (SmartScreen / Gatekeeper warnings).
+2. Run the installer + browser sign-in wizard steps on a clean machine or VM (never exercised end to end), and try dictation with a real microphone.
+3. Try the macOS and Linux builds on real hardware (CI only builds and tests them); verify "Continue in terminal" there.
+4. Click through the agent-teams picker and preset flows once in the real app.
+5. Ideas not built: embedded PTY terminal, in-app preset editor, notifications when a turn finishes, auto-update, code signing, a "working in background" state for background subagents (their `Agent` tool_result returns immediately), user-facing theme gallery.
 
 ## 12. Setting up on a new machine
 1. Install Node 20+, Rust (rustup, MSVC on Windows), Tauri prerequisites, git, the `claude` CLI; run `claude` once to log in.
