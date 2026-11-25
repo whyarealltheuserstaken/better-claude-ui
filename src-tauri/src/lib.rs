@@ -6,6 +6,7 @@ pub mod permissions;
 pub mod platform;
 pub mod presets;
 pub mod session;
+pub mod usage;
 
 use tauri::{Manager, RunEvent};
 
@@ -25,6 +26,9 @@ pub fn run() {
             commands::pending_permissions,
             commands::list_features,
             commands::list_presets,
+            commands::usage_summary,
+            commands::usage_limits,
+            commands::usage_clear,
             commands::auth_status,
             commands::installer_preview,
             commands::run_setup_step,

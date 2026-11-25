@@ -24,6 +24,9 @@ pub struct AppConfig {
     /// User-made themes and styles; the UI validates their shape.
     pub custom_themes: Vec<serde_json::Value>,
     pub custom_styles: Vec<serde_json::Value>,
+    /// Optional spending alerts (API-equivalent USD). None means no budget.
+    pub budget_daily_usd: Option<f64>,
+    pub budget_monthly_usd: Option<f64>,
 }
 
 impl Default for AppConfig {
@@ -40,6 +43,8 @@ impl Default for AppConfig {
             style: "modern".into(),
             custom_themes: vec![],
             custom_styles: vec![],
+            budget_daily_usd: None,
+            budget_monthly_usd: None,
         }
     }
 }
