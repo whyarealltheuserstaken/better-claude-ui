@@ -34,6 +34,18 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDhBRTMyMjIzODk5MThFMUQKUldRZGpwR0pJeUxqaWdjekNaOSt3cXZvWjF0UTIwNXJUandxVitUZlZLcjZ4U3VGd2ZCYXJtWXgK",
+      "endpoints": [
+        "https://github.com/whyarealltheuserstaken/better-claude-ui/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

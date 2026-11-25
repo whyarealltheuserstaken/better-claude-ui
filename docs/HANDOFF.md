@@ -67,12 +67,12 @@ What the owner asked for, in their own terms:
 | Artifact preview (sandboxed) | Real-app and release-build verified (`preview`) |
 | Voice dictation | API present in WebView2; **not tested with real speech** |
 | Continue in terminal | Windows only exercised (argument construction); macOS/Linux unverified |
-| In-app updater | **Does not exist.** Required before v0.1.0. Brief and acceptance criteria in `docs/GOALS.md` |
+| In-app updater | **Implemented; real-app verified against a local signed server** (genuine, tampered, wrong key, replay, bad JSON, 404, offline). **Not yet done:** install-and-relaunch on a real machine, GitHub signing secrets, private-key backup (all need the owner; see `docs/GOALS.md`) |
 | Release workflow | Written (`.github/workflows/release.yml`), **never run** (needs a tag; publishing is the owner's call; has no updater signing yet) |
 
-**Measured (Windows release build, 2026-11-25):** NSIS installer 1.74 MB, MSI 2.51 MB; Home visible in about 0.9 s from launch (including test attach); idle memory about 157 MB private across 7 processes (the app exe itself is 6 MB; the rest is WebView2), rising to about 255 MB after a real chat with a preview open. The original "under 100 MB" target is not achievable with WebView2; treat about 160 MB idle as the realistic figure (still far below Electron).
+**Measured (Windows release build, 2026-11-25):** NSIS installer 2.58 MB, MSI 3.57 MB (the updater added about 0.85 MB; earlier figures 1.74/2.51 MB were before it); Home visible in about 0.9 s from launch (including test attach); idle memory about 157 MB private across 7 processes (the app exe itself is 6 MB; the rest is WebView2), rising to about 255 MB after a real chat with a preview open. The original "under 100 MB" target is not achievable with WebView2; treat about 160 MB idle as the realistic figure (still far below Electron).
 
-**Tests:** Rust 84 unit + 8 integration, clippy `-D warnings` and fmt clean; UI 114 Vitest tests, `npm run check` 0 errors; 7 real-app E2E scenarios (`basic`, `attach`, `caps`, `chat`, `projects`, `preview`, `probe`).
+**Tests:** Rust 94 unit + 8 integration, clippy `-D warnings` and fmt clean; UI 131 Vitest tests, `npm run check` 0 errors; 8 real-app E2E scenarios (`basic`, `attach`, `caps`, `chat`, `projects`, `preview`, `updater`, `probe`).
 
 ## 4. How to build, run, test
 
@@ -188,8 +188,15 @@ The parser, broker and registry were written test-first with a RED run observed.
 - Rule now: `tidy()` in `tools/e2e.mjs` only forgets conversations whose `cliSessionId` belongs to a session that is LIVE in the freshly launched app (opened by the test). Never use a before/after diff of saved history. Scenarios that change settings (`tier`, `projects`) restore them in a `finally`.
 - E2E spend still appears in the Usage ledger (it is real spend).
 
+## 10j. Updater notes (session 3)
+- Design and security: `docs/DECISIONS/0003-in-app-updater.md`. Code: `src-tauri/src/updates.rs` (pure), commands in `commands.rs`, UI state machine in `src/lib/updates.ts`, UI in `UpdatePanel.svelte` and the Settings "Updates" section.
+- **Signed builds.** `createUpdaterArtifacts` is on, so `tauri build` signs and needs `TAURI_SIGNING_PRIVATE_KEY` (this CLI version does NOT read `TAURI_SIGNING_PRIVATE_KEY_PATH`; passing the key file path in `TAURI_SIGNING_PRIVATE_KEY` works) and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. Without them the bundles are built but the signing step errors.
+- **The signature is bound to the version.** The plugin rejects an installer whose signed version differs from the version the manifest announces (replay protection). So the version in `tauri.conf.json` at build time IS the signed version: bump it before tagging. To test locally with another version without editing files: `npm run tauri build -- --config '{"version":"0.1.1"}'`.
+- **Local test server:** `tools/update-server.mjs` (signs a dummy payload with the real key, plus tampered / wrong-key / replay / bad-JSON / 404 modes). `node tools/e2e.mjs updater` runs the whole matrix against the real app; add `BCU_REAL_ARTIFACT=<signed setup.exe>` and `BCU_REPLAY_ARTIFACT=<setup.exe signed for an older version>` for the real-installer checks. The tests stop at "Install and restart" and never click it. The debug-only override is the `BCU_UPDATE_ENDPOINT` env var; it does not exist in release builds.
+- Keys live outside the repo in `%USERPROFILE%\.bcu-updater\` on the machine that generated them; `*.key` is gitignored. Never print or paste them.
+
 ## 11. Next steps (in order)
-1. **Build the in-app updater first** (full brief and acceptance criteria in `docs/GOALS.md`). It needs a signing keypair that only the owner can create and store as GitHub secrets, so ask for that early. Do not start anything else for the release before this.
+1. ~~Build the in-app updater~~ **Done and verified** (ADR 0003). Remaining for the updater are owner-dependent: add the 2 GitHub secrets, back up the private key, approve a real install-and-relaunch test. See "Updater status" in `docs/GOALS.md`.
 1b. **Then the extra features the owner is defining** (listed in `docs/GOALS.md`; a different agent may be working on them, so check open PRs first).
 1c. **Only after 1 and 1b: publish v0.1.0** (owner decision). Follow `docs/RELEASING.md`: push a `v0.1.0` tag, let the workflow build a DRAFT release, test the installers, publish. Builds are unsigned (SmartScreen / Gatekeeper warnings).
 2. Run the installer + browser sign-in wizard steps on a clean machine or VM (never exercised end to end), and try dictation with a real microphone.

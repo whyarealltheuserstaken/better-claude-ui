@@ -1,3 +1,4 @@
+import type { UpdateInfo } from "./updates";
 import type { AppConfig, AuthStatus, CliOutput, LimitsSnapshot, UsageSummary, Preset, ChatItem, CliStatus, FeatureInfo, SessionEventPayload, StartOptions } from "./types";
 
 export const inTauri = (): boolean => typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -21,6 +22,10 @@ export const ipc = {
   runCli: (args: string[], cwd: string | null) => invoke<CliOutput>("run_cli", { args, cwd }),
   openInTerminal: (cliSessionId: string, cwd: string | null) => invoke<void>("open_in_terminal", { cliSessionId, cwd }),
   searchConversations: (query: string) => invoke<{ cli_session_id: string; snippet: string }[]>("search_conversations", { query }),
+  appVersion: () => invoke<string>("app_version"),
+  checkForUpdate: () => invoke<UpdateInfo>("check_for_update"),
+  downloadUpdate: () => invoke<void>("download_update"),
+  installUpdate: () => invoke<void>("install_update"),
   listPresets: () => invoke<Preset[]>("list_presets"),
   getConfig: () => invoke<AppConfig>("get_config"),
   setConfig: (config: AppConfig) => invoke<void>("set_config", { config }),
@@ -73,4 +78,10 @@ export async function onSetupLog(handler: (line: string) => void): Promise<() =>
   if (!inTauri()) return () => {};
   const { listen } = await import("@tauri-apps/api/event");
   return listen<string>("setup-log", (e) => handler(e.payload));
+}
+
+export async function onUpdateProgress(handler: (downloaded: number, total: number | null) => void): Promise<() => void> {
+  if (!inTauri()) return (await import("./mock")).mockUpdateProgress(handler);
+  const { listen } = await import("@tauri-apps/api/event");
+  return listen<{ downloaded: number; total: number | null }>("update-progress", (e) => handler(e.payload.downloaded, e.payload.total));
 }

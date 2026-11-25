@@ -24,6 +24,12 @@ async function playTurn(id: string, text: string) {
   cli(id, { kind: "permission_request", request_id: "r" + counter, tool: "Write", input: { file_path: "C:\\demo\\project\\notes.txt", content: "hello" }, description: "notes.txt", tool_use_id: "t" + counter });
 }
 
+const progressHandlers = new Set<(downloaded: number, total: number | null) => void>();
+export function mockUpdateProgress(h: (downloaded: number, total: number | null) => void): () => void {
+  progressHandlers.add(h);
+  return () => progressHandlers.delete(h);
+}
+
 export async function mockInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   switch (cmd) {
     case "cli_status":
@@ -79,10 +85,32 @@ export async function mockInvoke<T>(cmd: string, args?: Record<string, unknown>)
       return undefined as T;
     case "search_conversations":
       return [] as T;
+    case "app_version":
+      return "0.1.0" as T;
+    case "check_for_update": {
+      const mode = localStorage.getItem("mock_update") ?? "none";
+      await wait(400);
+      if (mode === "offline") throw { kind: "offline", message: "Couldn't reach the update server. Check your internet connection and try again.", detail: "mock" };
+      if (mode === "available") return { available: true, current_version: "0.1.0", version: "0.2.0", notes: "- Faster startup\n- New themes\n- Fixes for resuming conversations", date: Math.floor(Date.now() / 1000) - 86400 } as T;
+      return { available: false, current_version: "0.1.0", version: null, notes: null, date: null } as T;
+    }
+    case "download_update": {
+      if (localStorage.getItem("mock_update") === "unverified") {
+        await wait(300);
+        throw { kind: "unverified", message: "The update couldn't be verified, so it was not installed. This protects you from tampered files.", detail: "mock" };
+      }
+      for (let i = 1; i <= 10; i++) {
+        await wait(120);
+        progressHandlers.forEach((h) => h(i * 400000, 4000000));
+      }
+      return undefined as T;
+    }
+    case "install_update":
+      return undefined as T;
     case "list_presets":
       return [{ id: "deep-research", title: "Deep Research", description: "Mock preset", cost_note: "Costs more", agents: { researcher: { description: "r", prompt: "p" } }, system_prompt: "s", custom: false }] as T;
     case "get_config":
-      return JSON.parse(localStorage.getItem("mock_config") ?? "null") ?? { tier: "beginner", onboarded: false, default_model: null, default_permission_mode: null, always_allow: [], extra_args: [], recents: [], theme: "auto", style: "modern", custom_themes: [], custom_styles: [], budget_daily_usd: null, budget_monthly_usd: null, projects: [], home_widgets: ["quick-start", "limits", "spend-today", "spend-month", "daily-chart", "by-model", "by-project", "recent", "status"] } as T;
+      return JSON.parse(localStorage.getItem("mock_config") ?? "null") ?? { tier: "beginner", onboarded: false, default_model: null, default_permission_mode: null, always_allow: [], extra_args: [], recents: [], theme: "auto", style: "modern", custom_themes: [], custom_styles: [], budget_daily_usd: null, budget_monthly_usd: null, projects: [], auto_update_check: true, last_update_check: null, skipped_version: null, home_widgets: ["quick-start", "limits", "spend-today", "spend-month", "daily-chart", "by-model", "by-project", "recent", "status"] } as T;
     case "set_config":
       localStorage.setItem("mock_config", JSON.stringify(args!.config));
       return undefined as T;

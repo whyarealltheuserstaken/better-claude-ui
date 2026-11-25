@@ -2,7 +2,15 @@ name: Release
 
 # Runs when a version tag like v0.1.0 is pushed. Builds installers for Windows, macOS
 # (universal: Intel + Apple Silicon) and Linux, and attaches them to a DRAFT GitHub release
-# so a human can review the artifacts before publishing. Builds are unsigned (see docs).
+# so a human can review the artifacts before publishing.
+#
+# UPDATER SIGNING: every build is signed with the updater key so installed apps can verify updates.
+# Required repository secrets (see docs/RELEASING.md):
+#   TAURI_SIGNING_PRIVATE_KEY           the private key file CONTENT
+#   TAURI_SIGNING_PRIVATE_KEY_PASSWORD  its password
+# tauri-action then also uploads latest.json, which installed apps read. Note: latest.json is only
+# served at .../releases/latest/download/ once the release is PUBLISHED (a draft is not public).
+# Windows/macOS installers themselves are not code-signed (SmartScreen/Gatekeeper warnings).
 
 on:
   push:
@@ -43,13 +51,24 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libxdo-dev libssl-dev
       - run: npm ci
+      - name: Check updater signing secrets
+        shell: bash
+        env:
+          KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          if [ -z "$KEY" ]; then
+            echo "::error::TAURI_SIGNING_PRIVATE_KEY is not set. Releases must be signed so the in-app updater can verify them (see docs/RELEASING.md)."
+            exit 1
+          fi
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "BetterClaudeUI ${{ github.ref_name }}"
-          releaseBody: "Unofficial community build. Not affiliated with Anthropic. Requires the Claude Code CLI (the app's setup wizard can install it). Windows and macOS builds are unsigned, so your OS may warn on first launch; see docs/RELEASING.md."
+          releaseBody: "Unofficial community build. Not affiliated with Anthropic. Requires the Claude Code CLI (the app's setup wizard can install it). Windows and macOS installers are not code-signed, so your OS may warn on first launch; see docs/RELEASING.md."
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}

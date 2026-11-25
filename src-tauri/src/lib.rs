@@ -8,6 +8,7 @@ pub mod platform;
 pub mod presets;
 pub mod search;
 pub mod session;
+pub mod updates;
 pub mod usage;
 
 use tauri::{Manager, RunEvent};
@@ -17,6 +18,7 @@ pub fn run() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(commands::AppState::default())
         .invoke_handler(tauri::generate_handler![
             commands::cli_status,
@@ -28,6 +30,10 @@ pub fn run() {
             commands::pending_permissions,
             commands::list_features,
             commands::list_presets,
+            commands::app_version,
+            commands::check_for_update,
+            commands::download_update,
+            commands::install_update,
             commands::search_conversations,
             commands::open_in_terminal,
             commands::read_config_file,

@@ -10,6 +10,7 @@ use crate::permissions::{Decision, PendingPermission, PermissionBroker};
 use crate::platform;
 use crate::presets::{self, Preset};
 use crate::session::{SessionEvent, SessionManager, SessionOptions};
+use crate::updates::{self, ProblemKind, UpdateInfo, UpdateProblem};
 use crate::usage::{self, DeltaTracker, LimitsSnapshot, Record, Summary};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -17,6 +18,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Mutex as StdMutex;
 use tauri::{AppHandle, Emitter, State};
+use tauri_plugin_updater::UpdaterExt;
 use tokio::process::Command;
 use tokio::sync::Mutex;
 
@@ -42,8 +44,16 @@ fn now_ms() -> u64 {
         .unwrap_or(0)
 }
 
+/// An update found by the last check, and its downloaded (already verified) bytes.
+#[derive(Default)]
+struct PendingUpdate {
+    update: Option<tauri_plugin_updater::Update>,
+    bytes: Option<Vec<u8>>,
+}
+
 #[derive(Default)]
 pub struct AppState {
+    pending_update: Mutex<PendingUpdate>,
     manager: Mutex<Option<Arc<SessionManager>>>,
     broker: Arc<Mutex<PermissionBroker>>,
     usage: UsageCtx,
@@ -561,4 +571,145 @@ pub async fn search_conversations(query: String) -> Result<Vec<crate::search::Hi
     tokio::task::spawn_blocking(move || crate::search::search(&platform::config_dir(), &query))
         .await
         .map_err(|e| e.to_string())
+}
+
+/// The version of the running app.
+#[tauri::command]
+pub fn app_version(app: AppHandle) -> String {
+    app.package_info().version.to_string()
+}
+
+fn build_updater(app: &AppHandle) -> Result<tauri_plugin_updater::Updater, UpdateProblem> {
+    #[allow(unused_mut)]
+    let mut builder = app.updater_builder();
+    // Debug builds only: point the updater at a local test server. Release builds can only
+    // ever use the HTTPS endpoint compiled into tauri.conf.json.
+    #[cfg(debug_assertions)]
+    if let Ok(raw) = std::env::var("BCU_UPDATE_ENDPOINT") {
+        match updates::parse_endpoint(&raw) {
+            Some(url) => {
+                builder = builder
+                    .endpoints(vec![url])
+                    .map_err(|e| updates::classify(&e))?
+            }
+            None => {
+                return Err(UpdateProblem::other(
+                    "BCU_UPDATE_ENDPOINT is not a valid http(s) URL",
+                ));
+            }
+        }
+    }
+    builder.build().map_err(|e| updates::classify(&e))
+}
+
+/// Ask the update server whether a newer version exists. Remembers the result for
+/// `download_update`. Does not download anything.
+#[tauri::command]
+pub async fn check_for_update(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<UpdateInfo, UpdateProblem> {
+    let current_version = app.package_info().version.to_string();
+    let found = build_updater(&app)?
+        .check()
+        .await
+        .map_err(|e| updates::classify(&e))?;
+    let mut pending = state.pending_update.lock().await;
+    match found {
+        Some(u) => {
+            let info = UpdateInfo {
+                available: true,
+                current_version,
+                version: Some(u.version.clone()),
+                notes: updates::trim_notes(u.body.as_deref()),
+                date: u.date.map(|d| d.unix_timestamp()),
+            };
+            // A different version than before invalidates any downloaded bytes.
+            if pending.update.as_ref().map(|p| &p.version) != Some(&u.version) {
+                pending.bytes = None;
+            }
+            pending.update = Some(u);
+            Ok(info)
+        }
+        None => {
+            *pending = PendingUpdate::default();
+            Ok(UpdateInfo {
+                available: false,
+                current_version,
+                version: None,
+                notes: None,
+                date: None,
+            })
+        }
+    }
+}
+
+#[derive(Serialize, Clone)]
+struct UpdateProgress {
+    downloaded: u64,
+    total: Option<u64>,
+}
+
+/// Download the update found by `check_for_update` and verify its signature. Emits
+/// `update-progress` events. Nothing is installed.
+#[tauri::command]
+pub async fn download_update(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), UpdateProblem> {
+    let update = state
+        .pending_update
+        .lock()
+        .await
+        .update
+        .clone()
+        .ok_or_else(|| {
+            UpdateProblem::other("There is no update to download. Check for updates first.")
+        })?;
+    if !updates::download_url_allowed(update.download_url.scheme(), cfg!(debug_assertions)) {
+        return Err(UpdateProblem {
+            kind: ProblemKind::BuildConfig,
+            message:
+                "This update isn't offered over a secure connection, so it was not downloaded."
+                    .into(),
+            detail: format!("download url scheme {}", update.download_url.scheme()),
+        });
+    }
+    let mut downloaded: u64 = 0;
+    let handle = app.clone();
+    let bytes = update
+        .download(
+            move |chunk, total| {
+                downloaded += chunk as u64;
+                let _ = handle.emit("update-progress", UpdateProgress { downloaded, total });
+            },
+            || {},
+        )
+        .await
+        .map_err(|e| updates::classify(&e))?;
+    state.pending_update.lock().await.bytes = Some(bytes);
+    Ok(())
+}
+
+/// Install the verified, downloaded update and relaunch. On Windows the installer takes over
+/// and this process exits; the `claude` child processes are stopped first so none are orphaned.
+#[tauri::command]
+pub async fn install_update(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), UpdateProblem> {
+    let (update, bytes) = {
+        let p = state.pending_update.lock().await;
+        match (p.update.clone(), p.bytes.clone()) {
+            (Some(u), Some(b)) => (u, b),
+            _ => {
+                return Err(UpdateProblem::other(
+                    "The update hasn't been downloaded yet.",
+                ));
+            }
+        }
+    };
+    state.shutdown().await;
+    update.install(&bytes).map_err(|e| updates::classify(&e))?;
+    app.restart()
 }

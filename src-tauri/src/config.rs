@@ -31,6 +31,12 @@ pub struct AppConfig {
     pub home_widgets: Vec<String>,
     /// Named projects (instructions + optional folder); the UI validates their shape.
     pub projects: Vec<serde_json::Value>,
+    /// Check for app updates automatically (at most once a day).
+    pub auto_update_check: bool,
+    /// Unix milliseconds of the last update check (manual or automatic).
+    pub last_update_check: Option<u64>,
+    /// A version the user chose to skip; automatic checks stay quiet about it.
+    pub skipped_version: Option<String>,
 }
 
 impl Default for AppConfig {
@@ -64,6 +70,9 @@ impl Default for AppConfig {
             .map(String::from)
             .to_vec(),
             projects: vec![],
+            auto_update_check: true,
+            last_update_check: None,
+            skipped_version: None,
         }
     }
 }

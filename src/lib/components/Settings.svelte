@@ -1,13 +1,26 @@
 <script lang="ts">
+  import { type UpdateState, describeUpdateStatus } from "../updates";
   import Appearance from "./Appearance.svelte";
   import { MODELS, PERMISSION_MODES, TIERS, splitArgs, type Tier } from "../tier";
   import type { AppConfig } from "../types";
 
   let {
     config,
+    appVersion = "",
+    update = { phase: "idle" },
+    oncheck = () => {},
+    onviewupdate = () => {},
     onsave,
     onclose,
-  }: { config: AppConfig; onsave: (patch: Partial<AppConfig>) => void; onclose: () => void } = $props();
+  }: {
+    config: AppConfig;
+    appVersion?: string;
+    update?: UpdateState;
+    oncheck?: () => void;
+    onviewupdate?: () => void;
+    onsave: (patch: Partial<AppConfig>) => void;
+    onclose: () => void;
+  } = $props();
 
   let extra = $state(config.extra_args.join(" "));
   const modes = $derived(PERMISSION_MODES.filter((m) => m.id !== "bypassPermissions" || config.tier === "advanced"));
@@ -37,6 +50,22 @@
           <span><strong>{t.label}</strong><small>{t.blurb}</small></span>
         </label>
       {/each}
+    </section>
+
+    <section>
+      <h3>Updates</h3>
+      <p class="upd">BetterClaudeUI {appVersion ? `version ${appVersion}` : ""}</p>
+      <div class="updrow">
+        <button disabled={update.phase === "checking" || update.phase === "downloading" || update.phase === "installing"} onclick={oncheck}>Check for updates</button>
+        {#if update.phase === "available" || update.phase === "ready" || update.phase === "downloading"}
+          <button class="primary" onclick={onviewupdate}>View update</button>
+        {/if}
+      </div>
+      {#if describeUpdateStatus(update, Date.now())}<p class="updstatus" role="status" class:bad={update.phase === "error"}>{describeUpdateStatus(update, Date.now())}</p>{/if}
+      <label class="opt">
+        <input type="checkbox" checked={config.auto_update_check} onchange={(e) => onsave({ auto_update_check: e.currentTarget.checked })} />
+        <span><strong>Check for updates automatically</strong><small>At most once a day. Nothing is downloaded or installed without your OK.</small></span>
+      </label>
     </section>
 
     <section>
@@ -99,6 +128,13 @@
   .row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; }
   select, input.mono { background: var(--raised); color: var(--text); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 6px 8px; font: inherit; }
   input.mono { width: 100%; font-family: var(--mono); margin-bottom: 4px; }
+  .upd { margin: 0 0 8px; }
+  .updrow { display: flex; gap: 8px; margin-bottom: 6px; }
+  .updrow button { background: var(--raised); color: var(--text); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 5px 12px; }
+  .updrow button.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; font-weight: 600; }
+  .updrow button:disabled { opacity: 0.5; }
+  .updstatus { margin: 4px 0 8px; color: var(--muted); font-size: 13px; }
+  .updstatus.bad { color: var(--bad); }
   .chips { display: flex; gap: 6px; flex-wrap: wrap; }
   .chip { background: var(--raised); color: var(--text); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 3px 10px; }
 </style>

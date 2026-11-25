@@ -2,6 +2,8 @@
   import { onMount } from "svelte";
   import CapabilitiesPanel from "$lib/components/CapabilitiesPanel.svelte";
   import EditorPanel from "$lib/components/EditorPanel.svelte";
+  import UpdatePanel from "$lib/components/UpdatePanel.svelte";
+  import { reduceUpdate, shouldShowChip, progressFraction } from "$lib/updates";
   import ArtifactPreview from "$lib/components/ArtifactPreview.svelte";
   import ProjectsPanel from "$lib/components/ProjectsPanel.svelte";
   import { pickFolder } from "$lib/ipc";
@@ -161,6 +163,11 @@
           <span class="cwd" title={active.cwd ?? ""}>{app.activeMeta?.mode === "chat" ? "No tools in Chat" : (active.cwd ?? "")}</span>
         {/if}
         {#if app.view !== "session"}<span class="cwd"></span>{/if}
+        {#if shouldShowChip(app.update, app.config.skipped_version)}
+          <button class="chip accent" onclick={() => (app.showUpdate = true)} title="A new version of BetterClaudeUI is available">
+            {#if app.update.phase === "downloading"}Updating… {Math.round((progressFraction(app.update.downloaded, app.update.total) ?? 0) * 100)}%{:else if app.update.phase === "ready"}Ready to install{:else if app.update.phase === "installing"}Installing…{:else}Update available{/if}
+          </button>
+        {/if}
         {#if todayBudget.level !== "none"}
           <button class="chip" data-level={todayBudget.level} onclick={() => app.go("usage")} title="Today's estimated cost against your daily budget">Today {fmtUsd(app.usage?.today.cost_usd ?? 0)}</button>
         {/if}
@@ -267,6 +274,20 @@
 {#if app.showPalette}
   <Palette items={paletteItems} search={searchConversations} onclose={() => (app.showPalette = false)} />
 {/if}
+{#if app.showUpdate}
+  <UpdatePanel
+    state={app.update}
+    currentVersion={app.appVersion}
+    running={Object.values(app.states).filter((s) => s.status === "running").length}
+    pending={Object.values(app.states).reduce((n, s) => n + s.pending.length, 0)}
+    ondownload={() => app.downloadUpdate()}
+    oninstall={() => app.installUpdate()}
+    onskip={() => app.skipUpdateVersion()}
+    onretry={() => app.checkUpdates(true)}
+    ondismiss={() => (app.update = reduceUpdate(app.update, { type: "dismiss" }))}
+    onclose={() => (app.showUpdate = false)}
+  />
+{/if}
 {#if app.preview}
   <ArtifactPreview code={app.preview.code} lang={app.preview.lang} oncopy={(t) => app.copyText(t, "Code copied")} onclose={() => (app.preview = null)} />
 {/if}
@@ -290,7 +311,15 @@
   <PresetPicker presets={app.presets} advanced={app.tier === "advanced"} onstart={(p) => app.startPreset(p)} onclose={() => (app.showPresets = false)} />
 {/if}
 {#if app.showSettings}
-  <Settings config={app.config} onsave={(patch) => app.updateConfig(patch)} onclose={() => (app.showSettings = false)} />
+  <Settings
+    config={app.config}
+    appVersion={app.appVersion}
+    update={app.update}
+    oncheck={() => app.checkUpdates(true)}
+    onviewupdate={() => { app.showSettings = false; app.showUpdate = true; }}
+    onsave={(patch) => app.updateConfig(patch)}
+    onclose={() => (app.showSettings = false)}
+  />
 {/if}
 
 <style>
@@ -361,6 +390,11 @@
     padding: 1px 10px;
     font-size: 12.5px;
     color: var(--text);
+  }
+  .chip.accent {
+    border-color: var(--accent);
+    color: var(--accent);
+    font-weight: 600;
   }
   .chip[data-level="warn"] {
     border-color: var(--gate);

@@ -1,6 +1,6 @@
 // End-to-end test of the REAL app against the REAL `claude` CLI, driven over WebView2's debug port.
 // Windows: starts `npm run tauri dev` itself. Usage: node tools/e2e.mjs
-// Scenarios: `node tools/e2e.mjs` (permission flow, default), `attach` (image + text attachments in Chat), `caps` (slash menu, capabilities panel, CLAUDE.md editor), `chat` (palette, web search in Chat, tool lockdown, export), `projects` (project instructions applied to a chat, conversation search).
+// Scenarios: `node tools/e2e.mjs` (permission flow, default), `attach` (image + text attachments in Chat), `caps` (slash menu, capabilities panel, CLAUDE.md editor), `chat` (palette, web search in Chat, tool lockdown, export), `projects` (project instructions applied to a chat, conversation search), `updater` (in-app updater against a local signed test server; never installs anything).
 // Uses your claude login (a few cents of tokens). Exits non-zero on failure.
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, rmSync, readFileSync } from "node:fs";
@@ -8,6 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium } from "playwright-core";
 import { solidPng } from "./png.mjs";
+import { startUpdateServer } from "./update-server.mjs";
 
 const scenario = process.argv[2] ?? "basic";
 
@@ -15,6 +16,13 @@ const PORT = Number(process.env.E2E_PORT ?? 9477);
 const work = join(tmpdir(), "bcu-e2e-work");
 rmSync(work, { recursive: true, force: true });
 mkdirSync(work, { recursive: true });
+
+let updateServer = null;
+if (scenario === "updater") {
+  updateServer = await startUpdateServer({ port: 9488, realArtifact: process.env.BCU_REAL_ARTIFACT ?? null, replayArtifact: process.env.BCU_REPLAY_ARTIFACT ?? null });
+  process.env.BCU_UPDATE_ENDPOINT = updateServer.endpoint;
+  console.log("• local update server at", updateServer.endpoint);
+}
 
 const app = spawn("npm run tauri dev", {
   shell: true,
@@ -63,6 +71,127 @@ try {
   await page.getByRole("heading", { name: "Home" }).waitFor();
   step("Home visible, CLI detected");
   await page.getByText(/Claude Code \d/).first().waitFor();
+
+  if (scenario === "updater") {
+    const before = await page.evaluate(async () => {
+      const { app } = await import("/src/lib/store.svelte.ts");
+      const c = { auto_update_check: app.config.auto_update_check, last_update_check: app.config.last_update_check, skipped_version: app.config.skipped_version };
+      await app.updateConfig({ auto_update_check: false, skipped_version: null }); // keep the run deterministic
+      return c;
+    });
+    try {
+      const settings = page.getByRole("dialog", { name: "Settings" });
+      const openSettings = async () => { if (!(await settings.isVisible().catch(() => false))) { await page.getByRole("button", { name: "Settings", exact: true }).click(); await settings.waitFor(); } };
+      const check = async () => {
+        await openSettings();
+        await settings.getByRole("button", { name: "Check for updates" }).click();
+        await page.waitForFunction(() => { const t = document.querySelector(".updstatus")?.textContent ?? ""; return t && !t.startsWith("Checking"); });
+        return (await settings.locator(".updstatus").innerText()).trim();
+      };
+      const panel = page.getByRole("dialog", { name: "App update" });
+      const expect = (cond, msg) => { if (!cond) throw new Error(msg); };
+
+      // 1. Up to date: nothing is downloaded.
+      updateServer.setMode("none");
+      let t = await check();
+      step("none -> " + t);
+      expect(/up to date/i.test(t), "expected 'up to date'");
+      expect(!updateServer.hits.some((h) => h.includes(".bin")), "the app downloaded something when it was up to date");
+
+      // 2. A genuine, correctly signed update: found, downloaded, verified, ready. We stop there.
+      updateServer.setMode("ok");
+      t = await check();
+      step("ok -> " + t);
+      expect(/0\.1\.1 is available/.test(t), "expected version 0.1.1 to be offered");
+      await settings.getByRole("button", { name: "View update" }).click();
+      await panel.waitFor();
+      expect((await panel.innerText()).includes("Test release notes"), "release notes not shown");
+      await panel.getByRole("button", { name: "Download update" }).click();
+      const install = panel.getByRole("button", { name: "Install and restart" });
+      await install.waitFor();
+      expect(await install.isEnabled(), "install should be enabled when nothing is running");
+      step("ok -> downloaded and signature VERIFIED; Install is offered (NOT clicked)");
+      await panel.getByRole("button", { name: "Later" }).click();
+
+      // 2b. Optional: the REAL signed installer produced by `tauri build` verifies against the app's public key.
+      if (process.env.BCU_REAL_ARTIFACT) {
+        updateServer.setMode("none");
+        await check();
+        updateServer.setMode("real");
+        t = await check();
+        expect(/0\.1\.1 is available/.test(t), "real: expected the update to be offered");
+        await settings.getByRole("button", { name: "View update" }).click();
+        await panel.waitFor();
+        await panel.getByRole("button", { name: "Download update" }).click();
+        await page.waitForFunction(() => { const d = document.querySelector('[aria-label="App update"]'); return d && (d.querySelector(".err") || [...d.querySelectorAll("button")].some((b) => b.textContent.includes("Install and restart"))); });
+        const realErr = panel.locator(".err");
+        if (await realErr.count()) throw new Error("real installer was rejected: " + (await realErr.innerText()) + " | detail: " + (await panel.locator(".detail").textContent().catch(() => "")));
+        await panel.getByRole("button", { name: "Install and restart" }).waitFor();
+        step("REAL signed installer downloaded and verified against the app's public key (Install NOT clicked)");
+        await panel.getByRole("button", { name: "Later" }).click();
+      }
+
+      // 2c. Optional: REPLAY. A genuine installer signed for an older version, announced as newer, must be rejected.
+      if (process.env.BCU_REPLAY_ARTIFACT) {
+        updateServer.setMode("none");
+        await check();
+        updateServer.setMode("replay");
+        t = await check();
+        expect(/0\.1\.1 is available/.test(t), "replay: expected the (fake) update to be offered");
+        await settings.getByRole("button", { name: "View update" }).click();
+        await panel.waitFor();
+        await panel.getByRole("button", { name: "Download update" }).click();
+        await panel.locator(".err").waitFor();
+        const detail = (await panel.locator(".detail").textContent()) ?? "";
+        expect(/signed for version 0\.1\.0 but the update endpoint announced version 0\.1\.1/.test(detail), "replay: expected the signed-version mismatch, got: " + detail);
+        expect((await panel.getByRole("button", { name: "Install and restart" }).count()) === 0, "replay: Install must not be offered");
+        step("REPLAY of an older genuine, validly signed installer announced as newer -> rejected (signed-version mismatch)");
+        await panel.locator("button.x").click();
+      }
+
+      // 3. Tampered bytes and a wrong signing key must be rejected at download, never installed.
+      for (const bad of ["tampered", "wrongkey"]) {
+        updateServer.setMode("none");
+        await check(); // resets the pending update
+        updateServer.setMode(bad);
+        t = await check();
+        expect(/0\.1\.1 is available/.test(t), bad + ": expected the update to be offered");
+        await settings.getByRole("button", { name: "View update" }).click();
+        await panel.waitFor();
+        await panel.getByRole("button", { name: "Download update" }).click();
+        const err = panel.locator(".err");
+        await err.waitFor();
+        const msg = (await err.innerText()).trim();
+        step(bad + " -> " + msg);
+        expect(/couldn't be verified/.test(msg) && /not installed/.test(msg), bad + ": expected a verification failure message");
+        expect((await panel.getByRole("button", { name: "Install and restart" }).count()) === 0, bad + ": Install must not be offered");
+        await panel.locator("button.x").click();
+      }
+
+      // 4. Broken servers produce friendly messages and never break the app.
+      for (const [mode, re] of [["badjson", /usable update information/], ["missing", /usable update information/]]) {
+        updateServer.setMode(mode);
+        t = await check();
+        step(mode + " -> " + t);
+        expect(re.test(t), mode + ": unexpected message: " + t);
+      }
+      await updateServer.close();
+      t = await check();
+      step("offline -> " + t);
+      expect(/internet connection/.test(t), "offline: unexpected message: " + t);
+
+      // The app is still fully usable afterwards.
+      await settings.getByRole("button", { name: "Close settings" }).click();
+      await page.getByRole("heading", { name: "Home" }).waitFor();
+      step("app still usable after every failure");
+    } finally {
+      await page.evaluate(async (b) => { const { app } = await import("/src/lib/store.svelte.ts"); await app.updateConfig(b); }, before).catch(() => {});
+    }
+    await tidy();
+    console.log("E2E UPDATER PASSED");
+    cleanup(0);
+    await new Promise(() => {});
+  }
 
   if (scenario === "probe") {
     const r = await page.evaluate(() => ({

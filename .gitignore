@@ -10,3 +10,7 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
 .superpowers/
+
+# updater signing keys must never be committed
+*.key
+*.key.pub.secret
