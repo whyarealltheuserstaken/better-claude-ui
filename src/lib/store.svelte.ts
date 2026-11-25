@@ -1,7 +1,7 @@
 import { ipc, onSessionEvent, pickFolder } from "./ipc";
 import { addUserMessage, initialState, reduce, removePending, restoreItems } from "./reducer";
 import { type Caps, capsFor, normalizeTier } from "./tier";
-import type { AppConfig, AuthStatus, ChatItem, Preset, CliStatus, Mode, SavedSession, SessionState, StartOptions } from "./types";
+import type { AppConfig, AuthStatus, LimitsSnapshot, UsageSummary, ChatItem, Preset, CliStatus, Mode, SavedSession, SessionState, StartOptions } from "./types";
 
 export interface SessionMeta {
   id: string;
@@ -27,6 +27,9 @@ const defaultConfig = (): AppConfig => ({
   style: "modern",
   custom_themes: [],
   custom_styles: [],
+  budget_daily_usd: null,
+  budget_monthly_usd: null,
+  home_widgets: ["quick-start", "limits", "spend-today", "spend-month", "daily-chart", "by-model", "by-project", "recent", "status"],
 });
 
 /** First user message, trimmed, as a human title for a chat. */
@@ -49,6 +52,11 @@ class AppStore {
   error = $state<string | null>(null);
   showSettings = $state(false);
   showPresets = $state(false);
+  view = $state<"home" | "session" | "usage">("home");
+  limits = $state<LimitsSnapshot | null>(null);
+  usage = $state<UsageSummary | null>(null);
+  usageDays = $state(30);
+  homeEditing = $state(false);
   auth = $state<AuthStatus | null>(null);
   authSkipped = $state(false);
   presets = $state<Preset[]>([]);
@@ -69,7 +77,15 @@ class AppStore {
     this.unlisten ??= await onSessionEvent((p) => {
       // Events can arrive before start_session resolves, so create state on first sight.
       this.states[p.session_id] = reduce(this.states[p.session_id] ?? initialState(), p.event);
-      if (p.event.type === "cli" && p.event.event.kind === "turn_result") void this.persist(p.session_id);
+      if (p.event.type === "cli") {
+        const e = p.event.event;
+        if (e.kind === "turn_result") {
+          void this.persist(p.session_id);
+          setTimeout(() => void this.refreshUsage(), 700);
+        } else if (e.kind === "rate_limit" && e.windows.length > 0) {
+          this.limits = { captured_at: Date.now(), status: e.status, using_overage: e.using_overage, windows: e.windows };
+        }
+      }
     });
     try {
       this.config = { ...defaultConfig(), ...(await ipc.getConfig()) };
@@ -78,7 +94,18 @@ class AppStore {
     }
     this.configLoaded = true;
     this.presets = await ipc.listPresets().catch(() => []);
+    this.limits = await ipc.usageLimits().catch(() => null);
+    await this.refreshUsage();
     await this.checkCli();
+  }
+
+  async refreshUsage(days?: number) {
+    if (days) this.usageDays = days;
+    this.usage = await ipc.usageSummary(this.usageDays).catch(() => this.usage);
+  }
+
+  go(view: "home" | "session" | "usage") {
+    this.view = view;
   }
 
   async checkCli(overridePath?: string | null) {
@@ -106,6 +133,7 @@ class AppStore {
 
   setMode(m: Mode) {
     this.mode = m;
+    this.view = "session";
     const cur = this.metas.find((x) => x.id === this.activeId);
     if (!cur || cur.mode !== m) this.activeId = this.metas.filter((x) => x.mode === m).at(-1)?.id ?? null;
   }
@@ -142,6 +170,7 @@ class AppStore {
         },
       ];
       this.activeId = id;
+      this.view = "session";
     } catch (e) {
       this.error = String(e);
     }
@@ -167,6 +196,7 @@ class AppStore {
         { id, title: r.title, cwd: r.cwd, mode: r.mode, model: r.model, permissionMode: so.permission_mode ?? null, preset: r.preset },
       ];
       this.mode = r.mode;
+      this.view = "session";
       this.activeId = id;
     } catch (e) {
       this.error = String(e);
@@ -240,6 +270,7 @@ class AppStore {
 
   select(id: string) {
     this.activeId = id;
+    this.view = "session";
     const m = this.metas.find((x) => x.id === id);
     if (m) this.mode = m.mode;
   }

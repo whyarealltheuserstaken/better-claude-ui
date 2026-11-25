@@ -22,7 +22,16 @@ export type CliEvent =
       tool_use_id: string;
     }
   | { kind: "permission_denied"; tool: string; message: string }
-  | { kind: "turn_result"; is_error: boolean; result: string; cost_usd: number | null; session_id: string }
+  | {
+      kind: "turn_result";
+      is_error: boolean;
+      result: string;
+      cost_usd: number | null;
+      session_id: string;
+      duration_ms?: number | null;
+      num_turns?: number | null;
+    }
+  | { kind: "rate_limit"; status: string; windows: RateWindow[]; using_overage: boolean }
   | { kind: "info"; subtype: string }
   | { kind: "unknown"; raw: Json };
 
@@ -90,6 +99,8 @@ export interface SessionState {
   model: string | null;
   cwd: string | null;
   pending: PendingPermission[];
+  /** Cumulative API-equivalent cost of this session process, USD. */
+  costUsd: number;
   /** Capped log of raw events for Advanced view. */
   raw: SessionEvent[];
   nextId: number;
@@ -119,6 +130,9 @@ export interface AppConfig {
   style: string;
   custom_themes: unknown[];
   custom_styles: unknown[];
+  budget_daily_usd: number | null;
+  budget_monthly_usd: number | null;
+  home_widgets: string[];
 }
 
 export interface AgentDef {
@@ -139,6 +153,40 @@ export interface Preset {
 }
 
 export type AuthStatus =
-  | { state: "logged_in"; method: string }
+  | { state: "logged_in"; method: string; plan: string | null }
   | { state: "logged_out" }
   | { state: "unknown"; reason: string };
+
+export interface Totals {
+  cost_usd: number;
+  input: number;
+  output: number;
+  cache_read: number;
+  cache_write: number;
+  turns: number;
+}
+
+export interface UsageSummary {
+  today: Totals;
+  week: Totals;
+  month: Totals;
+  all: Totals;
+  by_model: { name: string; totals: Totals }[];
+  by_project: { name: string; totals: Totals }[];
+  daily: { date: string; cost_usd: number; tokens: number }[];
+  days: number;
+}
+
+export interface RateWindow {
+  name: string;
+  utilization: number;
+  resets_at: number | null;
+  status: string;
+}
+
+export interface LimitsSnapshot {
+  captured_at: number;
+  status: string;
+  using_overage: boolean;
+  windows: RateWindow[];
+}

@@ -38,6 +38,15 @@ Legend: [x] done · [~] in progress · [ ] todo
 - [ ] In-app preset editor (Intermediate+); for now users add JSON files to `<config>/presets/`
 
 ## Later
+## M7 — Full-replacement push (Claude Desktop + Code)
+- [x] Verified Deep Research end to end on the real CLI (4 researchers launched back-to-back in the background, writer produced a 7.7 KB cited report, $0.77). Tool: `tools/preset-smoke.mjs`
+- [x] Usage ledger (per-turn deltas, JSONL), subscription limit windows (5-hour / weekly) from `rate_limit_event`, daily/monthly budgets
+- [x] Home page with configurable widgets (9), Usage page (ranges, per model/project, CSV copy, billing links)
+- [ ] Attachments (images/files) in the composer
+- [ ] Slash commands, MCP / skills / plugins panels, CLAUDE.md and settings.json editors
+- [ ] Projects (named instructions + folder), conversation search, artifact preview, voice dictation
+- [ ] Embedded terminal fallback (Advanced)
+
 ## M5b — Setup wizard, themes, styles
 - [x] In-app setup wizard: detects missing CLI and signed-out state; runs the official installer and `claude auth login` on explicit click, streaming output
 - [x] 8 built-in themes + Match system; fully editable custom themes; import/export JSON

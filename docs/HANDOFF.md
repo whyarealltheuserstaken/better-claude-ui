@@ -151,6 +151,13 @@ The parser, broker and registry were written test-first with a RED run observed.
 - The installer and login flows are unit-tested and `auth_status` is verified against the real CLI, but the install + browser login flows have NOT been run end to end on a clean machine.
 - The app does not bundle the Claude CLI (redistribution/licensing); the wizard downloads Anthropic's official installer with the user's consent.
 
+## 10d. Usage tracking and widgets (session 2, later)
+- **Protocol facts (verified on the real CLI):** `result.total_cost_usd` and `result.modelUsage` are CUMULATIVE for the session process; top-level `result.usage` is per turn. `usage.rs::DeltaTracker` diffs them per (session, model); never record raw values. `rate_limit_event.rate_limit_info.unifiedWindows` gives `five_hour`/`seven_day` `utilization` (0..1) and `resetsAt`. `claude auth status` includes `subscriptionType` (plan). Costs are API list-price estimates, not what a subscriber pays; the UI says so. There is no API for invoices, so the app links to claude.ai/settings/usage and console billing instead of faking billing data.
+- Ledger: `<config>/usage.jsonl` (append-only), limits snapshot: `<config>/limits.json`. Summaries are computed in Rust (`usage::summarize`) with the local UTC offset passed from the UI.
+- Widgets live in `src/lib/widgets/` + `components/HomePage.svelte`; list/order in `config.home_widgets`.
+- **Deep Research finding:** background subagents return their `Agent` tool_result immediately (~0.6 s after launch) while still working, so a delegation card shows "done" early. They do run concurrently. Consider a "working in background" state.
+- Python is not installed; use Node. The Bash tool breaks on heredocs containing apostrophes, so write scripts with the Write tool.
+
 ## 11. Next steps (in order)
 0. PRs #2 and #3 are merged (M2-M4 + UI polish). The owner confirmed Code and Chat work in `tauri dev`; presets, resume and Settings still deserve a manual click-through.
 1. **Merge PR #1** (CI green) and tag `v0.0.1-alpha`; record release-build size/RAM in PROGRESS.md.

@@ -14,6 +14,8 @@ use tokio::process::Command;
 pub enum AuthStatus {
     LoggedIn {
         method: String,
+        /// Subscription plan, e.g. "pro" or "max", when the CLI reports it.
+        plan: Option<String>,
     },
     LoggedOut,
     /// The status command failed or printed something unexpected. The UI lets the user continue.
@@ -36,6 +38,10 @@ pub fn parse_auth_status(stdout: &str) -> AuthStatus {
                 .and_then(|m| m.as_str())
                 .unwrap_or("unknown")
                 .to_string(),
+            plan: v
+                .get("subscriptionType")
+                .and_then(|m| m.as_str())
+                .map(String::from),
         },
         Some(false) => AuthStatus::LoggedOut,
         None => AuthStatus::Unknown {
@@ -127,9 +133,12 @@ mod tests {
     #[test]
     fn parses_logged_in_and_out() {
         assert_eq!(
-            parse_auth_status(r#"{"loggedIn": true, "authMethod": "claude.ai"}"#),
+            parse_auth_status(
+                r#"{"loggedIn": true, "authMethod": "claude.ai", "subscriptionType": "pro"}"#
+            ),
             AuthStatus::LoggedIn {
-                method: "claude.ai".into()
+                method: "claude.ai".into(),
+                plan: Some("pro".into())
             }
         );
         assert_eq!(

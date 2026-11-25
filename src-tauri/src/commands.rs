@@ -9,17 +9,43 @@ use crate::permissions::{Decision, PendingPermission, PermissionBroker};
 use crate::platform;
 use crate::presets::{self, Preset};
 use crate::session::{SessionEvent, SessionManager, SessionOptions};
+use crate::usage::{self, DeltaTracker, LimitsSnapshot, Record, Summary};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::Mutex as StdMutex;
 use tauri::{AppHandle, Emitter, State};
 use tokio::process::Command;
 use tokio::sync::Mutex;
+
+/// What the usage ledger needs to know about a session.
+#[derive(Clone)]
+struct SessionInfo {
+    project: Option<String>,
+    mode: &'static str,
+    preset: Option<String>,
+}
+
+/// Shared state for recording usage from the event forwarder.
+#[derive(Clone, Default)]
+struct UsageCtx {
+    tracker: Arc<StdMutex<DeltaTracker>>,
+    info: Arc<StdMutex<HashMap<String, SessionInfo>>>,
+}
+
+fn now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
 
 #[derive(Default)]
 pub struct AppState {
     manager: Mutex<Option<Arc<SessionManager>>>,
     broker: Arc<Mutex<PermissionBroker>>,
+    usage: UsageCtx,
 }
 
 impl AppState {
@@ -76,13 +102,18 @@ pub async fn cli_status(
             old.stop_all().await;
         }
         let mgr = Arc::new(SessionManager::new(path.clone()));
-        spawn_forwarder(app, mgr.clone(), state.broker.clone());
+        spawn_forwarder(app, mgr.clone(), state.broker.clone(), state.usage.clone());
         *slot = Some(mgr);
     }
     Ok(status)
 }
 
-fn spawn_forwarder(app: AppHandle, mgr: Arc<SessionManager>, broker: Arc<Mutex<PermissionBroker>>) {
+fn spawn_forwarder(
+    app: AppHandle,
+    mgr: Arc<SessionManager>,
+    broker: Arc<Mutex<PermissionBroker>>,
+    ctx: UsageCtx,
+) {
     let mut rx = mgr.subscribe();
     tokio::spawn(async move {
         loop {
@@ -102,7 +133,35 @@ fn spawn_forwarder(app: AppHandle, mgr: Arc<SessionManager>, broker: Arc<Mutex<P
                         emit = false;
                     }
                 }
-                SessionEvent::Exited { .. } => broker.lock().await.clear_session(&sid),
+                SessionEvent::Cli {
+                    event:
+                        Event::TurnResult {
+                            session_id, models, ..
+                        },
+                } => record_usage(&ctx, &sid, session_id, models),
+                SessionEvent::Cli {
+                    event:
+                        Event::RateLimit {
+                            status,
+                            windows,
+                            using_overage,
+                        },
+                } if !windows.is_empty() => {
+                    let _ = usage::save_limits(
+                        &platform::config_dir(),
+                        &LimitsSnapshot {
+                            captured_at: now_ms(),
+                            status: status.clone(),
+                            using_overage: *using_overage,
+                            windows: windows.clone(),
+                        },
+                    );
+                }
+                SessionEvent::Exited { .. } => {
+                    broker.lock().await.clear_session(&sid);
+                    ctx.info.lock().unwrap().remove(&sid);
+                    ctx.tracker.lock().unwrap().forget(&sid);
+                }
                 _ => {}
             }
             if emit {
@@ -138,6 +197,13 @@ pub async fn start_session(
             cwd.display()
         ));
     }
+    let is_chat = opts.no_tools;
+    let project = if is_chat {
+        None
+    } else {
+        Some(cwd.to_string_lossy().to_string())
+    };
+    let preset_id = opts.preset.clone();
     let mut extra_args = opts.extra_args;
     if let Some(id) = &opts.preset {
         let all = presets::load_all(&platform::config_dir().join("presets"));
@@ -149,17 +215,27 @@ pub async fn start_session(
         a.extend(extra_args);
         extra_args = a;
     }
-    m.start(SessionOptions {
-        cwd,
-        model: opts.model,
-        permission_mode: opts.permission_mode,
-        resume: opts.resume,
-        no_tools: opts.no_tools,
-        extra_args,
-        ..Default::default()
-    })
-    .await
-    .map_err(|e| e.to_string())
+    let id = m
+        .start(SessionOptions {
+            cwd,
+            model: opts.model,
+            permission_mode: opts.permission_mode,
+            resume: opts.resume,
+            no_tools: opts.no_tools,
+            extra_args,
+            ..Default::default()
+        })
+        .await
+        .map_err(|e| e.to_string())?;
+    state.usage.info.lock().unwrap().insert(
+        id.clone(),
+        SessionInfo {
+            project,
+            mode: if is_chat { "chat" } else { "code" },
+            preset: preset_id,
+        },
+    );
+    Ok(id)
 }
 
 #[tauri::command]
@@ -322,4 +398,53 @@ pub async fn run_setup_step(app: AppHandle, step: String) -> Result<Option<i32>,
         let _ = app.emit("setup-log", line);
     })
     .await
+}
+
+fn record_usage(
+    ctx: &UsageCtx,
+    ui_session: &str,
+    cli_session: &str,
+    models: &[crate::cli::events::ModelUsage],
+) {
+    let info = ctx.info.lock().unwrap().get(ui_session).cloned();
+    let deltas = ctx.tracker.lock().unwrap().deltas(ui_session, models);
+    let ts = now_ms();
+    let records: Vec<Record> = deltas
+        .into_iter()
+        .map(|d| Record {
+            ts,
+            session: cli_session.to_string(),
+            project: info.as_ref().and_then(|i| i.project.clone()),
+            mode: info.as_ref().map_or("code", |i| i.mode).to_string(),
+            preset: info.as_ref().and_then(|i| i.preset.clone()),
+            model: d.model,
+            input: d.input,
+            output: d.output,
+            cache_read: d.cache_read,
+            cache_write: d.cache_write,
+            cost_usd: d.cost_usd,
+        })
+        .collect();
+    let _ = usage::append(&platform::config_dir(), &records);
+}
+
+/// Dashboard numbers. offset_minutes is the local UTC offset (east is positive).
+#[tauri::command]
+pub async fn usage_summary(offset_minutes: i32, days: u32) -> Result<Summary, String> {
+    tokio::task::spawn_blocking(move || {
+        let recs = usage::load(&platform::config_dir());
+        usage::summarize(&recs, now_ms(), offset_minutes, days)
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn usage_limits() -> Option<LimitsSnapshot> {
+    usage::load_limits(&platform::config_dir())
+}
+
+#[tauri::command]
+pub fn usage_clear() -> Result<(), String> {
+    usage::clear(&platform::config_dir()).map_err(|e| e.to_string())
 }

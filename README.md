@@ -9,6 +9,8 @@ A lightweight desktop UI for [Claude Code](https://claude.com/claude-code): the 
 - **Light:** Tauri + Rust, not Electron.
 - **Code and Chat modes** in one app.
 - **Experience tiers:** Beginner, Intermediate, Advanced.
+- **Usage and billing tracker:** tokens and estimated cost per day, model and project, plan allowance meters (5-hour and weekly), budgets and alerts.
+- **Home dashboard** with configurable widgets.
 - **Setup wizard:** detects a missing or signed-out Claude Code and walks you through installing and signing in.
 - **Themes and styles:** 8 themes, 4 styles (including a Terminal look), all editable, importable and exportable.
 - **Multi-agent presets:** Coordinator + Workers, Deep Research, Code + Review.

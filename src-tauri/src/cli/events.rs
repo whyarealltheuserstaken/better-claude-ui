@@ -4,6 +4,30 @@
 use serde::Serialize;
 use serde_json::Value;
 
+/// Per-model usage as reported in a `result` event. NOTE: the CLI reports these cumulatively
+/// for the whole session process, so consumers must diff successive values.
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+pub struct ModelUsage {
+    pub model: String,
+    pub input: u64,
+    pub output: u64,
+    pub cache_read: u64,
+    pub cache_write: u64,
+    pub web_searches: u64,
+    pub cost_usd: f64,
+}
+
+/// One subscription usage window from a `rate_limit_event` (e.g. `five_hour`, `seven_day`).
+#[derive(Debug, Clone, PartialEq, Serialize, serde::Deserialize)]
+pub struct RateWindow {
+    pub name: String,
+    /// 0.0 ..= 1.0
+    pub utilization: f64,
+    /// Unix seconds.
+    pub resets_at: Option<u64>,
+    pub status: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Block {
@@ -62,6 +86,16 @@ pub enum Event {
         result: String,
         cost_usd: Option<f64>,
         session_id: String,
+        duration_ms: Option<u64>,
+        num_turns: Option<u64>,
+        /// Cumulative per-model usage for the session process.
+        models: Vec<ModelUsage>,
+    },
+    /// Subscription usage windows and overage state.
+    RateLimit {
+        status: String,
+        windows: Vec<RateWindow>,
+        using_overage: bool,
     },
     /// Recognised but not interesting to the UI (hooks, status, rate limits, other stream events).
     Info {
@@ -238,11 +272,68 @@ fn interpret(v: Value) -> Vec<Event> {
             result: s(&v, "result"),
             cost_usd: v.get("total_cost_usd").and_then(Value::as_f64),
             session_id: s(&v, "session_id"),
+            duration_ms: v.get("duration_ms").and_then(Value::as_u64),
+            num_turns: v.get("num_turns").and_then(Value::as_u64),
+            models: parse_model_usage(&v),
         }],
-        "rate_limit_event" => vec![Event::Info {
-            subtype: "rate_limit".into(),
-        }],
+        "rate_limit_event" => vec![parse_rate_limit(&v)],
         _ => vec![Event::Unknown { raw: v }],
+    }
+}
+
+fn parse_model_usage(v: &Value) -> Vec<ModelUsage> {
+    let Some(map) = v.get("modelUsage").and_then(Value::as_object) else {
+        return vec![];
+    };
+    let n = |m: &Value, k: &str| m.get(k).and_then(Value::as_u64).unwrap_or(0);
+    let mut out: Vec<ModelUsage> = map
+        .iter()
+        .map(|(model, m)| ModelUsage {
+            model: model.clone(),
+            input: n(m, "inputTokens"),
+            output: n(m, "outputTokens"),
+            cache_read: n(m, "cacheReadInputTokens"),
+            cache_write: n(m, "cacheCreationInputTokens"),
+            web_searches: n(m, "webSearchRequests"),
+            cost_usd: m.get("costUSD").and_then(Value::as_f64).unwrap_or(0.0),
+        })
+        .collect();
+    out.sort_by(|a, b| a.model.cmp(&b.model));
+    out
+}
+
+fn parse_rate_limit(v: &Value) -> Event {
+    let info = v.get("rate_limit_info").unwrap_or(&Value::Null);
+    let mut windows: Vec<RateWindow> = info
+        .get("unifiedWindows")
+        .and_then(Value::as_object)
+        .map(|m| {
+            m.iter()
+                .map(|(name, w)| RateWindow {
+                    name: name.clone(),
+                    utilization: w.get("utilization").and_then(Value::as_f64).unwrap_or(0.0),
+                    resets_at: w.get("resetsAt").and_then(Value::as_u64),
+                    status: w
+                        .get("status")
+                        .and_then(Value::as_str)
+                        .unwrap_or("unknown")
+                        .to_string(),
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    windows.sort_by(|a, b| a.name.cmp(&b.name));
+    Event::RateLimit {
+        status: info
+            .get("status")
+            .and_then(Value::as_str)
+            .unwrap_or("unknown")
+            .to_string(),
+        windows,
+        using_overage: info
+            .get("isUsingOverage")
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
     }
 }
 
@@ -407,5 +498,81 @@ mod tests {
         ] {
             let _ = parse_line(l);
         }
+    }
+
+    #[test]
+    fn result_carries_per_model_usage_and_duration() {
+        let line = r#"{"type":"result","is_error":false,"result":"ok","total_cost_usd":0.5,"session_id":"s","duration_ms":1200,"num_turns":3,"modelUsage":{"claude-haiku-5-5":{"inputTokens":4,"outputTokens":71,"cacheReadInputTokens":10,"cacheCreationInputTokens":20,"webSearchRequests":2,"costUSD":0.25},"a-model":{"inputTokens":1}}}"#;
+        match parse_line(line).unwrap().remove(0) {
+            Event::TurnResult {
+                models,
+                duration_ms,
+                num_turns,
+                cost_usd,
+                ..
+            } => {
+                assert_eq!(duration_ms, Some(1200));
+                assert_eq!(num_turns, Some(3));
+                assert_eq!(cost_usd, Some(0.5));
+                assert_eq!(models.len(), 2);
+                assert_eq!(models[0].model, "a-model");
+                let h = &models[1];
+                assert_eq!(
+                    (
+                        h.input,
+                        h.output,
+                        h.cache_read,
+                        h.cache_write,
+                        h.web_searches
+                    ),
+                    (4, 71, 10, 20, 2)
+                );
+                assert!((h.cost_usd - 0.25).abs() < 1e-9);
+            }
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+
+    #[test]
+    fn result_without_usage_still_parses() {
+        let line = r#"{"type":"result","is_error":true,"result":"boom","session_id":"s"}"#;
+        match parse_line(line).unwrap().remove(0) {
+            Event::TurnResult {
+                models, cost_usd, ..
+            } => {
+                assert!(models.is_empty());
+                assert_eq!(cost_usd, None);
+            }
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parses_rate_limit_windows() {
+        let line = r#"{"type":"rate_limit_event","rate_limit_info":{"status":"allowed","isUsingOverage":false,"unifiedWindows":{"seven_day":{"utilization":0.09,"resetsAt":1795989600,"status":"allowed"},"five_hour":{"utilization":0.3,"resetsAt":1795635600,"status":"allowed"}}}}"#;
+        match parse_line(line).unwrap().remove(0) {
+            Event::RateLimit {
+                status,
+                windows,
+                using_overage,
+            } => {
+                assert_eq!(status, "allowed");
+                assert!(!using_overage);
+                assert_eq!(windows.len(), 2);
+                assert_eq!(windows[0].name, "five_hour");
+                assert!((windows[0].utilization - 0.3).abs() < 1e-9);
+                assert_eq!(windows[0].resets_at, Some(1795635600));
+            }
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+
+    #[test]
+    fn malformed_rate_limit_is_tolerated() {
+        let line = r#"{"type":"rate_limit_event"}"#;
+        assert!(matches!(
+            parse_line(line).unwrap().remove(0),
+            Event::RateLimit { .. }
+        ));
     }
 }

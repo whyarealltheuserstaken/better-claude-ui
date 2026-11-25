@@ -3,7 +3,7 @@ import type { ChatItem, CliEvent, SessionEvent, SessionState } from "./types";
 const RAW_CAP = 1000;
 
 export function initialState(): SessionState {
-  return { items: [], status: "idle", cliSessionId: null, model: null, cwd: null, pending: [], raw: [], nextId: 1 };
+  return { items: [], status: "idle", cliSessionId: null, model: null, cwd: null, pending: [], costUsd: 0, raw: [], nextId: 1 };
 }
 
 function pushItem(s: SessionState, make: (id: string) => ChatItem): SessionState {
@@ -84,7 +84,7 @@ function onCli(s: SessionState, e: CliEvent): SessionState {
     case "permission_denied":
       return pushItem(s, (id) => ({ kind: "notice", id, level: "info", text: `Blocked ${e.tool}: ${e.message}` }));
     case "turn_result": {
-      let st: SessionState = { ...s, status: "idle" };
+      let st: SessionState = { ...s, status: "idle", costUsd: e.cost_usd ?? s.costUsd };
       if (e.is_error) st = pushItem(st, (id) => ({ kind: "notice", id, level: "error", text: e.result || "The request failed." }));
       return st;
     }

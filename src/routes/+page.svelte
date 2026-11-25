@@ -1,5 +1,9 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import HomePage from "$lib/components/HomePage.svelte";
+  import UsagePage from "$lib/components/UsagePage.svelte";
+  import { ipc, openUrl } from "$lib/ipc";
+  import { budgetState, fmtUsd } from "$lib/format";
   import PresetPicker from "$lib/components/PresetPicker.svelte";
   import Onboarding from "$lib/components/Onboarding.svelte";
   import RawLog from "$lib/components/RawLog.svelte";
@@ -43,6 +47,7 @@
       resolveStyle(app.config.style, app.config.custom_styles),
     );
   });
+  const todayBudget = $derived(budgetState(app.usage?.today.cost_usd ?? 0, app.config.budget_daily_usd));
   const glyph = $derived(resolveStyle(app.config.style, app.config.custom_styles).glyph);
 
   const needsSetup = $derived(
@@ -80,14 +85,21 @@
     />
     <section class="main">
       <div class="topbar">
-        <div class="seg" role="tablist" aria-label="Mode">
-          <button role="tab" aria-selected={app.mode === "chat"} class:on={app.mode === "chat"} onclick={() => app.setMode("chat")}>Chat</button>
-          <button role="tab" aria-selected={app.mode === "code"} class:on={app.mode === "code"} onclick={() => app.setMode("code")}>Code</button>
+        <div class="seg" role="tablist" aria-label="Section">
+          <button role="tab" aria-selected={app.view === "home"} class:on={app.view === "home"} onclick={() => app.go("home")}>Home</button>
+          <button role="tab" aria-selected={app.view === "session" && app.mode === "chat"} class:on={app.view === "session" && app.mode === "chat"} onclick={() => app.setMode("chat")}>Chat</button>
+          <button role="tab" aria-selected={app.view === "session" && app.mode === "code"} class:on={app.view === "session" && app.mode === "code"} onclick={() => app.setMode("code")}>Code</button>
+          <button role="tab" aria-selected={app.view === "usage"} class:on={app.view === "usage"} onclick={() => app.go("usage")}>Usage</button>
         </div>
-        {#if active}
+        {#if active && app.view === "session"}
           <span class="cwd" title={active.cwd ?? ""}>{app.activeMeta?.mode === "chat" ? "No tools in Chat" : (active.cwd ?? "")}</span>
         {/if}
-        <span class="tier">{[app.tier, active?.model, app.activeMeta?.preset ? `team: ${app.activeMeta.preset}` : null].filter(Boolean).join(" · ")}</span>
+        {#if app.view !== "session"}<span class="cwd"></span>{/if}
+        {#if todayBudget.level !== "none"}
+          <button class="chip" data-level={todayBudget.level} onclick={() => app.go("usage")} title="Today's estimated cost against your daily budget">Today {fmtUsd(app.usage?.today.cost_usd ?? 0)}</button>
+        {/if}
+        {#if app.view === "session" && active && active.costUsd > 0}<span class="tier" title="Estimated cost of this session (API prices)">{fmtUsd(active.costUsd)}</span>{/if}
+        <span class="tier">{[app.tier, app.view === "session" ? active?.model : null, app.view === "session" && app.activeMeta?.preset ? `team: ${app.activeMeta.preset}` : null].filter(Boolean).join(" · ")}</span>
       </div>
       {#if app.error}
         <div class="banner" role="alert">
@@ -95,7 +107,39 @@
           <button onclick={() => (app.error = null)} aria-label="Dismiss">×</button>
         </div>
       {/if}
-      {#if active}
+      {#if app.view === "home"}
+        <div class="scrollpage">
+          <HomePage
+            config={app.config}
+            usage={app.usage}
+            limits={app.limits}
+            cli={app.cli}
+            auth={app.auth}
+            editing={app.homeEditing}
+            onsave={(patch) => app.updateConfig(patch)}
+            onedit={(v) => (app.homeEditing = v)}
+            onnewchat={() => { app.setMode("chat"); void app.newSession(); }}
+            onnewcode={() => { app.setMode("code"); void app.newSession(); }}
+            onteams={() => (app.showPresets = true)}
+            onresume={(r) => app.resume(r)}
+            onusage={() => app.go("usage")}
+          />
+        </div>
+      {:else if app.view === "usage"}
+        <div class="scrollpage">
+          <UsagePage
+            config={app.config}
+            usage={app.usage}
+            limits={app.limits}
+            auth={app.auth}
+            days={app.usageDays}
+            onrange={(d) => app.refreshUsage(d)}
+            onsave={(patch) => app.updateConfig(patch)}
+            onclear={async () => { await ipc.usageClear(); await app.refreshUsage(); }}
+            onopen={(u) => void openUrl(u)}
+          />
+        </div>
+      {:else if active}
         {#if active.items.length === 0}
           <div class="starters">
             <h2>{app.activeMeta?.mode === "chat" ? "Ask anything" : "Where should Claude start?"}</h2>
@@ -161,6 +205,7 @@
     flex-direction: column;
   }
   .topbar {
+    gap: 12px;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -192,6 +237,26 @@
   }
   .tier::first-letter {
     text-transform: uppercase;
+  }
+  .scrollpage {
+    flex: 1;
+    overflow-y: auto;
+  }
+  .chip {
+    background: var(--raised);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 1px 10px;
+    font-size: 12.5px;
+    color: var(--text);
+  }
+  .chip[data-level="warn"] {
+    border-color: var(--gate);
+    color: var(--gate);
+  }
+  .chip[data-level="over"] {
+    border-color: var(--bad);
+    color: var(--bad);
   }
   .starters {
     flex: 1;
