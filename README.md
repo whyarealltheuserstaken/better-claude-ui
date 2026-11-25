@@ -20,13 +20,14 @@ _(Screenshots use demo data.)_
 - **Usage and billing tracker:** tokens and estimated cost per day, model and project, plan allowance meters (5-hour and weekly), budgets and alerts.
 - **Home dashboard** with configurable widgets.
 - **Projects** with standing instructions, **search** across conversations, **Ctrl+K command palette**, **web search in Chat**, **attachments**, slash commands, MCP/skills panels, CLAUDE.md and settings editors.
+- **In-app updates:** signed updates only, checked quietly once a day (can be turned off), nothing installs without your click.
 - **Setup wizard:** detects a missing or signed-out Claude Code and walks you through installing and signing in.
 - **Themes and styles:** 8 themes, 4 styles (including a Terminal look), all editable, importable and exportable.
 - **Multi-agent presets:** Coordinator + Workers, Deep Research, Code + Review.
 - **Extensible:** features, presets and themes are modules/data files (see `docs/EXTENDING.md`).
 
 ## Status
-Pre-release (0.1.0 candidate, not published yet: an in-app updater and a few more features come first, see [`docs/GOALS.md`](docs/GOALS.md)). Windows is the tested platform; macOS and Linux builds pass CI but have not been run on real hardware. Installers are unsigned. See [`docs/RELEASING.md`](docs/RELEASING.md).
+Pre-release (0.1.0 candidate, not published yet: a few more features come first, see [`docs/GOALS.md`](docs/GOALS.md)). The in-app updater is built; real install testing is pending. Windows is the tested platform; macOS and Linux builds pass CI but have not been run on real hardware. Installers are unsigned. See [`docs/RELEASING.md`](docs/RELEASING.md).
 
 Roadmap and current state: See [`docs/PROGRESS.md`](docs/PROGRESS.md) for the roadmap and [`docs/HANDOFF.md`](docs/HANDOFF.md) for the current state.
 

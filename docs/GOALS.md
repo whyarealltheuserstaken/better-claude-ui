@@ -6,7 +6,7 @@ The single place for "what must happen before the first release, and what comes 
 
 **Do not tag or publish v0.1.0 until every item below is done.** The app itself is otherwise feature-complete (see `docs/HANDOFF.md` section 3).
 
-1. **In-app updater, built first.** Status: **not started.** Brief below.
+1. **In-app updater, built first.** Status: **implemented and verified in the real app, except the final install-and-relaunch step, which needs the owner's go-ahead.** Design: `docs/DECISIONS/0003-in-app-updater.md`. Remaining owner actions are listed under "Updater status" below.
 2. **A few more features, defined by the owner and built by a different agent.** Status: **not started; list to be added by the owner.** Put them here as they are decided, one line each with acceptance criteria:
    - _(owner to fill in)_
    - _(owner to fill in)_
@@ -15,11 +15,27 @@ The single place for "what must happen before the first release, and what comes 
 
 Why the updater comes first: v0.1.0 is the baseline everyone installs. An updater can only update versions that already contain it, so shipping v0.1.0 without one would force every early user to reinstall by hand.
 
-## Brief: in-app updater
+## Updater status (2026-11-26)
+
+Built (PR for branch `feat/updater`; design and security notes in ADR 0003):
+- [x] Signing keypair generated (public key committed in `tauri.conf.json`; the private key and password are NOT in the repo)
+- [x] Rust commands: check, download (signature verified), install (relaunch); plain-language errors; HTTPS-only in release builds; debug-only test endpoint
+- [x] UI: Settings section (version, Check for updates, automatic checks on/off), quiet "Update available" chip, update panel with release notes, progress, "Skip this version", install blocked while Claude is replying
+- [x] Release workflow signs builds and fails early if the signing secret is missing
+- [x] Verified in the real app against a local signed test server (`node tools/e2e.mjs updater`): genuine update verified; tampered bytes, wrong key and **replayed older installer** rejected; bad JSON, 404 and offline give friendly messages
+- [x] A real `tauri build` installer, signed as 0.1.1, verifies against the app's public key (`BCU_REAL_ARTIFACT`)
+
+**Still open (owner actions or approval needed):**
+- [ ] **Add the two GitHub Actions secrets** (`TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`). Until then a tagged release build will stop at the guard step by design. The key is at `%USERPROFILE%\.bcu-updater\updater.key` with its password in `key.password` on the machine that generated it.
+- [ ] **Back up the private key and password** somewhere safe and separate (a password manager). Losing it means installed copies can never be updated.
+- [ ] **Real install-and-relaunch test** (install an old build, update it to a newer signed one, confirm it relaunches on the new version). It replaces an installed app, so it needs approval, plus two real versions.
+- [ ] macOS and Linux update paths (never run on real hardware)
+
+## Brief: in-app updater (original spec, kept for reference)
 
 **Goal.** The installed app can find, download and install a newer release without the user visiting GitHub, and can never install something that was not signed by the project owner.
 
-**Current state.** Nothing exists: no plugin, no config, no UI, no signing keys. `docs/RELEASING.md` says "Users download new versions manually."
+**Original state (before this work):** nothing existed. See "Updater status" below for what exists now.
 
 **Likely approach** (written from knowledge of Tauri v2; verify against the current Tauri docs before relying on any detail):
 - Rust: `tauri-plugin-updater` (and `tauri-plugin-process` to relaunch after install). Register in `src-tauri/src/lib.rs`, add `updater:default` (and process permissions) to `src-tauri/capabilities/default.json`.

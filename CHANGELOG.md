@@ -1,7 +1,8 @@
 # Changelog
 
 ## Unreleased
-- Planned before 0.1.0 ships: in-app updater, plus a few owner-chosen features (see `docs/GOALS.md`).
+- **In-app updater**: signed updates only (tampered, wrongly signed and replayed installers are rejected), quiet daily check, manual check, release notes, progress, skip a version, never installs without a click or mid-reply. Verified against a local signed test server; real install-and-relaunch pending.
+- Still planned before 0.1.0 ships: a few owner-chosen features (see `docs/GOALS.md`).
 
 ## 0.1.0 (candidate, not released)
 First complete version, pending the release gate in `docs/GOALS.md`.
@@ -16,5 +17,5 @@ First complete version, pending the release gate in `docs/GOALS.md`.
 - Artifact preview (sandboxed), voice dictation (where the webview supports it), export to Markdown, continue in terminal.
 - Strict production CSP; unofficial and not affiliated with Anthropic.
 
-Known limits: no in-app updater yet; installers are unsigned; macOS and Linux untested on real hardware; dictation and the installer/sign-in flow were not exercised end to end.
+Known limits: installers are not code-signed; macOS and Linux untested on real hardware; dictation and the installer/sign-in flow were not exercised end to end.
 

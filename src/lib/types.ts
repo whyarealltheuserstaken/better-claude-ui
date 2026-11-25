@@ -145,6 +145,9 @@ export interface AppConfig {
   budget_monthly_usd: number | null;
   home_widgets: string[];
   projects: unknown[];
+  auto_update_check: boolean;
+  last_update_check: number | null;
+  skipped_version: string | null;
 }
 
 export interface AgentDef {

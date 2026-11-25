@@ -1,7 +1,8 @@
 import { type PendingAttachment, composeText, toWire } from "./attachments";
 import { exportMarkdown } from "./export";
 import { allProjects, findProject } from "./projects";
-import { ipc, onSessionEvent, pickFolder } from "./ipc";
+import { ipc, onSessionEvent, onUpdateProgress, pickFolder } from "./ipc";
+import { type UpdateProblem, type UpdateState, installBlockedReason, reduceUpdate, shouldAutoCheck } from "./updates";
 import { addUserMessage, initialState, reduce, removePending, restoreItems } from "./reducer";
 import { type Caps, capsFor, normalizeTier } from "./tier";
 import type { AppConfig, AuthStatus, LimitsSnapshot, UsageSummary, ChatItem, Preset, CliStatus, Mode, SavedSession, SessionState, StartOptions } from "./types";
@@ -37,6 +38,9 @@ const defaultConfig = (): AppConfig => ({
   budget_monthly_usd: null,
   home_widgets: ["quick-start", "limits", "spend-today", "spend-month", "daily-chart", "by-model", "by-project", "recent", "status"],
   projects: [],
+  auto_update_check: true,
+  last_update_check: null,
+  skipped_version: null,
 });
 
 /** First user message, trimmed, as a human title for a chat. */
@@ -62,6 +66,9 @@ class AppStore {
   showCaps = $state(false);
   showPalette = $state(false);
   showProjects = $state(false);
+  update = $state<UpdateState>({ phase: "idle" });
+  appVersion = $state("");
+  showUpdate = $state(false);
   preview = $state<{ code: string; lang: string } | null>(null);
   toast = $state<string | null>(null);
   private toastTimer: ReturnType<typeof setTimeout> | null = null;
@@ -107,10 +114,68 @@ class AppStore {
       this.error = String(e);
     }
     this.configLoaded = true;
+    this.appVersion = await ipc.appVersion().catch(() => "");
+    await onUpdateProgress((downloaded, total) => (this.update = reduceUpdate(this.update, { type: "progress", downloaded, total })));
+    // Quiet, at most once a day, and never while the first screens are still loading.
+    setTimeout(() => void this.autoCheckUpdates(), 6000);
     this.presets = await ipc.listPresets().catch(() => []);
     this.limits = await ipc.usageLimits().catch(() => null);
     await this.refreshUsage();
     await this.checkCli();
+  }
+
+  private asProblem(e: unknown): UpdateProblem {
+    if (e && typeof e === "object" && "message" in e && "kind" in e) return e as UpdateProblem;
+    const text = String(e);
+    return { kind: "other", message: "Couldn't check for updates right now. Please try again later.", detail: text };
+  }
+
+  /** Manual checks show their result; automatic ones stay silent unless an update is found. */
+  async checkUpdates(manual = true) {
+    this.update = reduceUpdate(this.update, { type: "check_start", manual });
+    try {
+      const info = await ipc.checkForUpdate();
+      this.update = reduceUpdate(this.update, { type: "check_ok", info, now: Date.now() });
+      await this.updateConfig({ last_update_check: Date.now() });
+    } catch (e) {
+      if (manual) this.update = reduceUpdate(this.update, { type: "check_fail", problem: this.asProblem(e) });
+      else if (this.update.phase === "checking") this.update = { phase: "idle" };
+    }
+  }
+
+  async autoCheckUpdates() {
+    if (shouldAutoCheck(this.config.auto_update_check, this.config.last_update_check, Date.now())) await this.checkUpdates(false);
+  }
+
+  async downloadUpdate() {
+    this.update = reduceUpdate(this.update, { type: "download_start" });
+    try {
+      await ipc.downloadUpdate();
+      this.update = reduceUpdate(this.update, { type: "download_ok" });
+    } catch (e) {
+      this.update = reduceUpdate(this.update, { type: "download_fail", problem: this.asProblem(e) });
+    }
+  }
+
+  async installUpdate() {
+    const running = Object.values(this.states).filter((s) => s.status === "running").length;
+    const pending = Object.values(this.states).reduce((n, s) => n + s.pending.length, 0);
+    const blocked = installBlockedReason(running, pending);
+    if (blocked) {
+      this.error = blocked;
+      return;
+    }
+    this.update = reduceUpdate(this.update, { type: "install_start" });
+    try {
+      await ipc.installUpdate();
+    } catch (e) {
+      this.update = reduceUpdate(this.update, { type: "install_fail", problem: this.asProblem(e) });
+    }
+  }
+
+  skipUpdateVersion() {
+    if (this.update.phase === "available") void this.updateConfig({ skipped_version: this.update.info.version });
+    this.showUpdate = false;
   }
 
   async refreshUsage(days?: number) {
