@@ -27,6 +27,20 @@ pub fn config_dir() -> PathBuf {
     base.unwrap_or_else(std::env::temp_dir).join(APP_DIR_NAME)
 }
 
+/// True when spawning failed only because the executable was momentarily open for writing
+/// (Linux `ETXTBSY`); such a spawn is safe to retry shortly after.
+pub fn is_transient_spawn_error(e: &std::io::Error) -> bool {
+    #[cfg(unix)]
+    {
+        e.raw_os_error() == Some(26)
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = e;
+        false
+    }
+}
+
 /// File names the `claude` executable may have on this OS, in preference order.
 pub fn cli_file_names() -> &'static [&'static str] {
     #[cfg(windows)]
