@@ -28,7 +28,8 @@ export async function mockInvoke<T>(cmd: string, args?: Record<string, unknown>)
       return (localStorage.getItem("mock_setup") === "missing" ? { state: "not_found" } : { state: "found", path: "claude (mock)", version: "mock" }) as T;
     case "start_session": {
       const id = "m" + ++counter;
-      setTimeout(() => cli(id, { kind: "session_init", session_id: "cli-" + id, model: "claude-sonnet-5-5", cwd: "C:\\demo\\project" }), 50);
+      setTimeout(() => cli(id, { kind: "initialized", info: { commands: [{ name: "review", description: "Review a pull request" }, { name: "init", description: "Create a CLAUDE.md for this project" }, { name: "compact", description: "Summarize the conversation to free up context" }, { name: "security-review", description: "Review pending changes for security issues" }], agents: [], models: [{ value: "default", display_name: "Default (recommended)", description: "" }, { value: "opus", display_name: "Opus 5.5", description: "" }, { value: "sonnet", display_name: "Sonnet 5.5", description: "" }, { value: "haiku", display_name: "Haiku 5.5", description: "" }], output_styles: ["default"], version: "mock" } }), 10);
+      setTimeout(() => cli(id, { kind: "session_init", session_id: "cli-" + id, model: "claude-sonnet-5-5", cwd: "C:\\demo\\project", caps: { slash_commands: ["review", "init", "compact", "security-review", "superpowers:brainstorming"], skills: ["frontend-design:frontend-design", "superpowers:brainstorming"], agents: ["claude", "Explore"], tools: ["Bash", "Read", "Edit"], mcp_servers: [{ name: "github", status: "connected" }, { name: "chrome-devtools", status: "failed" }], plugins: ["superpowers"], version: "2.1.332" } }), 50);
       return id as T;
     }
     case "send_message":
@@ -65,6 +66,13 @@ export async function mockInvoke<T>(cmd: string, args?: Record<string, unknown>)
       return { captured_at: Date.now() - 60000, status: "allowed", using_overage: false, windows: [{ name: "five_hour", utilization: 0.62, resets_at: Math.floor(Date.now() / 1000) + 5400, status: "allowed" }, { name: "seven_day", utilization: 0.31, resets_at: Math.floor(Date.now() / 1000) + 3 * 86400, status: "allowed" }] } as T;
     case "usage_clear":
       return undefined as T;
+    case "read_config_file":
+      return (localStorage.getItem("mock_file_" + args!.target) ?? "") as T;
+    case "write_config_file":
+      localStorage.setItem("mock_file_" + args!.target, args!.content as string);
+      return undefined as T;
+    case "run_cli":
+      return { code: 0, output: "mock: " + (args!.args as string[]).join(" ") } as T;
     case "list_presets":
       return [{ id: "deep-research", title: "Deep Research", description: "Mock preset", cost_note: "Costs more", agents: { researcher: { description: "r", prompt: "p" } }, system_prompt: "s", custom: false }] as T;
     case "get_config":

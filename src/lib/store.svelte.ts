@@ -53,6 +53,8 @@ class AppStore {
   error = $state<string | null>(null);
   showSettings = $state(false);
   showPresets = $state(false);
+  showCaps = $state(false);
+  showEditor = $state(false);
   view = $state<"home" | "session" | "usage">("home");
   limits = $state<LimitsSnapshot | null>(null);
   usage = $state<UsageSummary | null>(null);

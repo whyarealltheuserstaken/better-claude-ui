@@ -119,3 +119,13 @@ describe("restoreItems", () => {
     expect(new Set(s.items.map((i) => i.id)).size).toBe(4);
   });
 });
+
+describe("initialized", () => {
+  test("stores commands, agents and models from the initialize reply", () => {
+    const info = { commands: [{ name: "review", description: "Review" }], agents: [], models: [{ value: "opus", display_name: "Opus", description: "" }], output_styles: ["default"], version: "2.1.0" };
+    const s = reduce(initialState(), { type: "cli", event: { kind: "initialized", info } });
+    expect(s.info?.commands[0].name).toBe("review");
+    expect(s.info?.models[0].value).toBe("opus");
+    expect(s.items).toHaveLength(0);
+  });
+});

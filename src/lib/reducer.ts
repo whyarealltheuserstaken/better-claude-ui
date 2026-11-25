@@ -3,7 +3,7 @@ import type { ChatItem, CliEvent, SessionEvent, SessionState } from "./types";
 const RAW_CAP = 1000;
 
 export function initialState(): SessionState {
-  return { items: [], status: "idle", cliSessionId: null, model: null, cwd: null, pending: [], costUsd: 0, raw: [], nextId: 1 };
+  return { items: [], status: "idle", cliSessionId: null, model: null, cwd: null, pending: [], caps: null, info: null, costUsd: 0, raw: [], nextId: 1 };
 }
 
 function pushItem(s: SessionState, make: (id: string) => ChatItem): SessionState {
@@ -26,7 +26,9 @@ function replaceAt(s: SessionState, i: number, item: ChatItem): SessionState {
 function onCli(s: SessionState, e: CliEvent): SessionState {
   switch (e.kind) {
     case "session_init":
-      return { ...s, cliSessionId: e.session_id, model: e.model, cwd: e.cwd };
+      return { ...s, cliSessionId: e.session_id, model: e.model, cwd: e.cwd, caps: e.caps ?? s.caps };
+    case "initialized":
+      return { ...s, info: e.info };
     case "text_delta": {
       const i = lastStreaming(s);
       if (i >= 0) {

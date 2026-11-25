@@ -124,9 +124,18 @@ async fn send_writes_json_user_turn_to_stdin() {
         tokio::time::sleep(Duration::from_millis(50)).await;
     }
     let text = std::fs::read_to_string(&log).expect("fake logged stdin");
-    let v: serde_json::Value = serde_json::from_str(text.lines().next().unwrap()).unwrap();
-    assert_eq!(v["type"], "user");
-    assert_eq!(v["message"]["content"], "hello \"world\"");
+    let lines: Vec<serde_json::Value> = text
+        .lines()
+        .map(|l| serde_json::from_str(l).unwrap())
+        .collect();
+    // The session asks for its commands/models up front, before any user turn.
+    assert_eq!(lines[0]["type"], "control_request");
+    assert_eq!(lines[0]["request"]["subtype"], "initialize");
+    let user = lines
+        .iter()
+        .find(|v| v["type"] == "user")
+        .expect("user turn");
+    assert_eq!(user["message"]["content"], "hello \"world\"");
     m.stop(&id).await.unwrap();
 }
 

@@ -1,15 +1,20 @@
 <script lang="ts">
   import { type PendingAttachment, canAdd, fmtSize, fromFile } from "../attachments";
+  import { completeCommand, slashMatches, slashQuery } from "../slash";
   import type { SessionStatus } from "../types";
 
   let {
     status,
     glyph = "",
+    commands = [],
+    descriptions = {},
     onsend,
     oninterrupt,
   }: {
     status: SessionStatus;
     glyph?: string;
+    commands?: string[];
+    descriptions?: Record<string, string>;
     onsend: (text: string, attachments: PendingAttachment[]) => void;
     oninterrupt: () => void;
   } = $props();
@@ -19,6 +24,15 @@
   let problem = $state<string | null>(null);
   let dragging = $state(false);
   let picker: HTMLInputElement | undefined = $state();
+  let sel = $state(0);
+  let dismissed = $state<string | null>(null);
+
+  const query = $derived(slashQuery(text));
+  const matches = $derived(query !== null && dismissed !== text ? slashMatches(query, commands) : []);
+  $effect(() => {
+    void matches;
+    sel = 0;
+  });
 
   const running = $derived(status === "running");
   const disabled = $derived(status === "exited");
@@ -46,7 +60,27 @@
     problem = null;
   }
 
+  function pick(cmd: string) {
+    text = completeCommand(cmd);
+  }
+
   function onkey(e: KeyboardEvent) {
+    if (matches.length > 0) {
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        sel = (sel + (e.key === "ArrowDown" ? 1 : matches.length - 1)) % matches.length;
+        return;
+      }
+      if ((e.key === "Enter" && !e.shiftKey) || e.key === "Tab") {
+        e.preventDefault();
+        pick(matches[sel]);
+        return;
+      }
+      if (e.key === "Escape") {
+        dismissed = text;
+        return;
+      }
+    }
     if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
       e.preventDefault();
       submit();
@@ -94,6 +128,15 @@
       {/each}
     </ul>
   {/if}
+  {#if matches.length > 0}
+    <ul class="slash" role="listbox" aria-label="Commands">
+      {#each matches as m, i (m)}
+        <li role="option" aria-selected={i === sel}>
+          <button class:on={i === sel} tabindex="-1" onmousedown={(e) => { e.preventDefault(); pick(m); }}><span class="cn">/{m}</span>{#if descriptions[m]}<span class="cd">{descriptions[m]}</span>{/if}</button>
+        </li>
+      {/each}
+    </ul>
+  {/if}
   <div class="row">
     {#if glyph}<span class="glyph" aria-hidden="true">{glyph}</span>{/if}
     <button class="attach" onclick={() => picker?.click()} disabled={disabled} aria-label="Attach files" title="Attach images, PDFs or text files (or paste or drop them)">+</button>
@@ -117,7 +160,7 @@
 </div>
 
 <style>
-  .composer { padding: 10px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); }
+  .composer { position: relative; padding: 10px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); }
   .composer:focus-within { border-color: var(--accent); }
   .composer.dragging { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
   .row { display: flex; gap: 10px; align-items: flex-end; }
@@ -136,5 +179,12 @@
   .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .sz { color: var(--muted); }
   .rm { background: none; border: 0; padding: 0 6px; color: var(--muted); font-size: 15px; }
+  .slash { position: absolute; left: 10px; right: 10px; bottom: calc(100% + 6px); margin: 0; padding: 4px; list-style: none; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 8px 24px rgb(0 0 0 / 0.25); z-index: 5; }
+  .slash button { width: 100%; text-align: left; background: none; border: 0; padding: 5px 10px; border-radius: var(--radius-sm); font-family: var(--mono); font-size: 13px; font-weight: 500; color: var(--text); }
+  .slash button { display: flex; gap: 12px; align-items: baseline; }
+  .cn { flex: none; }
+  .cd { color: var(--muted); font-family: var(--ui); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .slash button.on .cd { color: inherit; opacity: 0.85; }
+  .slash button.on { background: var(--accent); color: var(--accent-ink); }
   .problem { color: var(--gate); margin: 6px 0 0; font-size: 12.5px; }
 </style>

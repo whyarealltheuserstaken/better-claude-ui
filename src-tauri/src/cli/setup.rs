@@ -125,6 +125,16 @@ pub async fn run_streaming(
     Ok(status.code())
 }
 
+/// Only these `claude` subcommands can be run from the UI (no shell, fixed verbs).
+pub fn is_allowed_cli_args(args: &[String]) -> bool {
+    let a: Vec<&str> = args.iter().map(String::as_str).collect();
+    match a.as_slice() {
+        ["mcp", verb, ..] => matches!(*verb, "list" | "get" | "add" | "remove"),
+        ["plugin", "list", ..] => true,
+        _ => false,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -145,6 +155,23 @@ mod tests {
             parse_auth_status(r#"{"loggedIn": false}"#),
             AuthStatus::LoggedOut
         );
+    }
+
+    #[test]
+    fn only_mcp_management_and_plugin_list_are_allowed() {
+        let v = |s: &str| s.split(' ').map(String::from).collect::<Vec<_>>();
+        assert!(is_allowed_cli_args(&v("mcp list")));
+        assert!(is_allowed_cli_args(&v(
+            "mcp add --transport http gh https://x"
+        )));
+        assert!(is_allowed_cli_args(&v("mcp remove gh")));
+        assert!(is_allowed_cli_args(&v("plugin list")));
+        assert!(!is_allowed_cli_args(&v("mcp serve")));
+        assert!(!is_allowed_cli_args(&v("mcp add-from-claude-desktop")));
+        assert!(!is_allowed_cli_args(&v("plugin install x")));
+        assert!(!is_allowed_cli_args(&v("auth logout")));
+        assert!(!is_allowed_cli_args(&v("-p hello")));
+        assert!(!is_allowed_cli_args(&[]));
     }
 
     #[test]

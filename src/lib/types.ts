@@ -8,7 +8,7 @@ export type Block =
   | { kind: "tool_use"; id: string; name: string; input: Record<string, unknown> };
 
 export type CliEvent =
-  | { kind: "session_init"; session_id: string; model: string; cwd: string }
+  | { kind: "session_init"; session_id: string; model: string; cwd: string; caps?: Capabilities }
   | { kind: "text_delta"; text: string; parent_tool_use_id: string | null }
   | { kind: "thinking_delta"; text: string; parent_tool_use_id: string | null }
   | { kind: "assistant_message"; blocks: Block[]; parent_tool_use_id: string | null }
@@ -31,6 +31,7 @@ export type CliEvent =
       duration_ms?: number | null;
       num_turns?: number | null;
     }
+  | { kind: "initialized"; info: InitInfo }
   | { kind: "rate_limit"; status: string; windows: RateWindow[]; using_overage: boolean }
   | { kind: "info"; subtype: string }
   | { kind: "unknown"; raw: Json };
@@ -99,6 +100,10 @@ export interface SessionState {
   model: string | null;
   cwd: string | null;
   pending: PendingPermission[];
+  /** What this session can do (slash commands, skills, MCP...), from the init event. */
+  caps: Capabilities | null;
+  /** Commands, agents and models from the initialize reply (available before the first message). */
+  info: InitInfo | null;
   /** Cumulative API-equivalent cost of this session process, USD. */
   costUsd: number;
   /** Capped log of raw events for Advanced view. */
@@ -189,4 +194,38 @@ export interface LimitsSnapshot {
   status: string;
   using_overage: boolean;
   windows: RateWindow[];
+}
+
+export interface Capabilities {
+  slash_commands: string[];
+  skills: string[];
+  agents: string[];
+  tools: string[];
+  mcp_servers: { name: string; status: string }[];
+  plugins: string[];
+  version: string;
+}
+
+export interface CliOutput {
+  code: number | null;
+  output: string;
+}
+
+export interface Described {
+  name: string;
+  description: string;
+}
+
+export interface ModelInfo {
+  value: string;
+  display_name: string;
+  description: string;
+}
+
+export interface InitInfo {
+  commands: Described[];
+  agents: Described[];
+  models: ModelInfo[];
+  output_styles: string[];
+  version: string;
 }

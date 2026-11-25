@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 pub const APP_DIR_NAME: &str = "better-claude-ui";
 
-fn home() -> Option<PathBuf> {
+pub fn home() -> Option<PathBuf> {
     #[cfg(windows)]
     let v = std::env::var_os("USERPROFILE");
     #[cfg(not(windows))]

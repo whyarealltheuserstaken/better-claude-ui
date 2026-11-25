@@ -2,6 +2,7 @@ pub mod cli;
 pub mod commands;
 pub mod config;
 pub mod features;
+pub mod files;
 pub mod permissions;
 pub mod platform;
 pub mod presets;
@@ -26,6 +27,9 @@ pub fn run() {
             commands::pending_permissions,
             commands::list_features,
             commands::list_presets,
+            commands::read_config_file,
+            commands::write_config_file,
+            commands::run_cli,
             commands::usage_summary,
             commands::usage_limits,
             commands::usage_clear,
