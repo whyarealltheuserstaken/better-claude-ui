@@ -41,15 +41,34 @@ export async function mockInvoke<T>(cmd: string, args?: Record<string, unknown>)
       return undefined as T;
     }
     case "auth_status":
-      return (localStorage.getItem("mock_setup") === "loggedout" ? { state: "logged_out" } : { state: "logged_in", method: "claude.ai" }) as T;
+      return (localStorage.getItem("mock_setup") === "loggedout" ? { state: "logged_out" } : { state: "logged_in", method: "claude.ai", plan: "pro" }) as T;
     case "installer_preview":
       return "irm https://claude.ai/install.ps1 | iex" as T;
     case "run_setup_step":
       return 0 as T;
+    case "usage_summary": {
+      const days = (args!.days as number) || 30;
+      const daily = Array.from({ length: days }, (_, i) => {
+        const d = new Date(Date.now() - (days - 1 - i) * 86400000);
+        const c = i % 6 === 0 ? 0 : Math.abs(Math.sin(i * 1.7)) * 4;
+        return { date: d.toISOString().slice(0, 10), cost_usd: c, tokens: Math.round(c * 180000) };
+      });
+      const t = (c: number, n: number) => ({ cost_usd: c, input: n * 20, output: n * 6, cache_read: n * 300, cache_write: n * 40, turns: n });
+      return {
+        today: t(2.41, 18), week: t(14.8, 120), month: t(41.3, 410), all: t(96.2, 1200),
+        by_model: [{ name: "claude-opus-5-5", totals: t(30, 150) }, { name: "claude-sonnet-5-5", totals: t(10.4, 240) }, { name: "claude-haiku-5-5", totals: t(0.9, 20) }],
+        by_project: [{ name: "C:\\demo\\project", totals: t(25, 200) }, { name: "Chat", totals: t(9, 150) }, { name: "C:\\demo\\other", totals: t(7.3, 60) }],
+        daily, days,
+      } as T;
+    }
+    case "usage_limits":
+      return { captured_at: Date.now() - 60000, status: "allowed", using_overage: false, windows: [{ name: "five_hour", utilization: 0.62, resets_at: Math.floor(Date.now() / 1000) + 5400, status: "allowed" }, { name: "seven_day", utilization: 0.31, resets_at: Math.floor(Date.now() / 1000) + 3 * 86400, status: "allowed" }] } as T;
+    case "usage_clear":
+      return undefined as T;
     case "list_presets":
       return [{ id: "deep-research", title: "Deep Research", description: "Mock preset", cost_note: "Costs more", agents: { researcher: { description: "r", prompt: "p" } }, system_prompt: "s", custom: false }] as T;
     case "get_config":
-      return JSON.parse(localStorage.getItem("mock_config") ?? "null") ?? { tier: "beginner", onboarded: false, default_model: null, default_permission_mode: null, always_allow: [], extra_args: [], recents: [], theme: "auto", style: "modern", custom_themes: [], custom_styles: [] } as T;
+      return JSON.parse(localStorage.getItem("mock_config") ?? "null") ?? { tier: "beginner", onboarded: false, default_model: null, default_permission_mode: null, always_allow: [], extra_args: [], recents: [], theme: "auto", style: "modern", custom_themes: [], custom_styles: [], budget_daily_usd: null, budget_monthly_usd: null, home_widgets: ["quick-start", "limits", "spend-today", "spend-month", "daily-chart", "by-model", "by-project", "recent", "status"] } as T;
     case "set_config":
       localStorage.setItem("mock_config", JSON.stringify(args!.config));
       return undefined as T;

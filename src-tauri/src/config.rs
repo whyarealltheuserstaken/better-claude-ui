@@ -27,6 +27,8 @@ pub struct AppConfig {
     /// Optional spending alerts (API-equivalent USD). None means no budget.
     pub budget_daily_usd: Option<f64>,
     pub budget_monthly_usd: Option<f64>,
+    /// Ordered ids of the widgets shown on the Home page.
+    pub home_widgets: Vec<String>,
 }
 
 impl Default for AppConfig {
@@ -45,6 +47,19 @@ impl Default for AppConfig {
             custom_styles: vec![],
             budget_daily_usd: None,
             budget_monthly_usd: None,
+            home_widgets: [
+                "quick-start",
+                "limits",
+                "spend-today",
+                "spend-month",
+                "daily-chart",
+                "by-model",
+                "by-project",
+                "recent",
+                "status",
+            ]
+            .map(String::from)
+            .to_vec(),
         }
     }
 }

@@ -1,4 +1,4 @@
-import type { AppConfig, AuthStatus, Preset, ChatItem, CliStatus, FeatureInfo, SessionEventPayload, StartOptions } from "./types";
+import type { AppConfig, AuthStatus, LimitsSnapshot, UsageSummary, Preset, ChatItem, CliStatus, FeatureInfo, SessionEventPayload, StartOptions } from "./types";
 
 export const inTauri = (): boolean => typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
@@ -12,6 +12,9 @@ export const ipc = {
   authStatus: () => invoke<AuthStatus>("auth_status"),
   installerPreview: () => invoke<string>("installer_preview"),
   runSetupStep: (step: "install" | "login") => invoke<number | null>("run_setup_step", { step }),
+  usageSummary: (days: number) => invoke<UsageSummary>("usage_summary", { offsetMinutes: -new Date().getTimezoneOffset(), days }),
+  usageLimits: () => invoke<LimitsSnapshot | null>("usage_limits"),
+  usageClear: () => invoke<void>("usage_clear"),
   listPresets: () => invoke<Preset[]>("list_presets"),
   getConfig: () => invoke<AppConfig>("get_config"),
   setConfig: (config: AppConfig) => invoke<void>("set_config", { config }),
@@ -40,6 +43,16 @@ export async function onSessionEvent(handler: (p: SessionEventPayload) => void):
   if (!inTauri()) return (await import("./mock")).mockListen(handler);
   const { listen } = await import("@tauri-apps/api/event");
   return listen<SessionEventPayload>("session-event", (e) => handler(e.payload));
+}
+
+export async function openUrl(url: string): Promise<void> {
+  if (!/^https:\/\//.test(url)) return;
+  if (!inTauri()) {
+    window.open(url, "_blank", "noopener,noreferrer");
+    return;
+  }
+  const { openUrl } = await import("@tauri-apps/plugin-opener");
+  await openUrl(url);
 }
 
 export async function pickFolder(): Promise<string | null> {
