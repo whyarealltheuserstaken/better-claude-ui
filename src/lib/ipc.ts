@@ -19,6 +19,7 @@ export const ipc = {
   writeConfigFile: (target: string, project: string | null, content: string) =>
     invoke<void>("write_config_file", { target, project, content }),
   runCli: (args: string[], cwd: string | null) => invoke<CliOutput>("run_cli", { args, cwd }),
+  openInTerminal: (cliSessionId: string, cwd: string | null) => invoke<void>("open_in_terminal", { cliSessionId, cwd }),
   listPresets: () => invoke<Preset[]>("list_presets"),
   getConfig: () => invoke<AppConfig>("get_config"),
   setConfig: (config: AppConfig) => invoke<void>("set_config", { config }),

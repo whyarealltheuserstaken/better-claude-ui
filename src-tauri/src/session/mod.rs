@@ -23,6 +23,10 @@ pub struct SessionOptions {
     pub resume: Option<String>,
     /// Run with no tools at all (Chat mode).
     pub no_tools: bool,
+    /// In Chat mode, allow only web search and page fetching.
+    pub web_search: bool,
+    /// Thinking effort: low, medium, high, xhigh or max.
+    pub effort: Option<String>,
     pub extra_args: Vec<String>,
     /// Extra environment variables for the child process.
     pub env: Vec<(String, String)>,
@@ -54,6 +58,10 @@ pub enum SessionError {
     Write(String),
 }
 
+pub fn is_effort(s: &str) -> bool {
+    matches!(s, "low" | "medium" | "high" | "xhigh" | "max")
+}
+
 /// Command-line arguments for a session (everything after the executable).
 pub fn build_args(o: &SessionOptions) -> Vec<String> {
     let mut a: Vec<String> = [
@@ -80,7 +88,18 @@ pub fn build_args(o: &SessionOptions) -> Vec<String> {
         a.extend(["--resume".into(), r.clone()]);
     }
     if o.no_tools {
-        a.extend(["--tools".into(), String::new()]);
+        let tools = if o.web_search {
+            "WebSearch,WebFetch"
+        } else {
+            ""
+        };
+        a.extend(["--tools".into(), tools.into()]);
+        // --tools only limits built-in tools. Without this, the user's MCP servers (GitHub,
+        // browser control, ...) would stay available in Chat. Verified against the real CLI.
+        a.push("--strict-mcp-config".into());
+    }
+    if let Some(e) = o.effort.as_deref().filter(|e| is_effort(e)) {
+        a.extend(["--effort".into(), e.to_string()]);
     }
     a.extend(o.extra_args.iter().cloned());
     a
@@ -427,6 +446,53 @@ mod tests {
             media_type: mt.into(),
             data: data.into(),
         }
+    }
+
+    #[test]
+    fn chat_mode_tools_are_none_or_web_only() {
+        let none = build_args(&SessionOptions {
+            no_tools: true,
+            ..Default::default()
+        });
+        let p = none.iter().position(|x| x == "--tools").unwrap();
+        assert_eq!(none[p + 1], "");
+        assert!(
+            none.contains(&"--strict-mcp-config".to_string()),
+            "chat must also drop MCP tools"
+        );
+        let web = build_args(&SessionOptions {
+            no_tools: true,
+            web_search: true,
+            ..Default::default()
+        });
+        let p = web.iter().position(|x| x == "--tools").unwrap();
+        assert_eq!(web[p + 1], "WebSearch,WebFetch");
+        // web_search alone (Code mode) must not restrict tools
+        let code = build_args(&SessionOptions {
+            web_search: true,
+            ..Default::default()
+        });
+        assert!(!code.contains(&"--tools".to_string()));
+        assert!(
+            !code.contains(&"--strict-mcp-config".to_string()),
+            "code mode keeps MCP"
+        );
+    }
+
+    #[test]
+    fn effort_is_validated() {
+        let ok = build_args(&SessionOptions {
+            effort: Some("high".into()),
+            ..Default::default()
+        });
+        let p = ok.iter().position(|x| x == "--effort").unwrap();
+        assert_eq!(ok[p + 1], "high");
+        let bad = build_args(&SessionOptions {
+            effort: Some("--dangerously-skip-permissions".into()),
+            ..Default::default()
+        });
+        assert!(!bad.contains(&"--effort".to_string()));
+        assert!(!bad.iter().any(|a| a.contains("dangerously")));
     }
 
     #[test]

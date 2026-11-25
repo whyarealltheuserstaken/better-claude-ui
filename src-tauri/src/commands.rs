@@ -73,6 +73,9 @@ pub struct StartOptions {
     pub no_tools: bool,
     #[serde(default)]
     pub extra_args: Vec<String>,
+    #[serde(default)]
+    pub web_search: bool,
+    pub effort: Option<String>,
     /// Preset id (see `presets`), resolved to `--agents` + a coordinator system prompt.
     pub preset: Option<String>,
 }
@@ -224,6 +227,8 @@ pub async fn start_session(
             resume: opts.resume,
             no_tools: opts.no_tools,
             extra_args,
+            web_search: opts.web_search,
+            effort: opts.effort,
             ..Default::default()
         })
         .await
@@ -511,4 +516,28 @@ pub async fn run_cli(args: Vec<String>, cwd: Option<String>) -> Result<CliOutput
         .map_err(|_| "the command took too long".to_string())??;
     let output = lines.lock().unwrap().join("\n");
     Ok(CliOutput { code, output })
+}
+
+/// Open the user's own terminal and continue this conversation there (escape hatch).
+#[tauri::command]
+pub fn open_in_terminal(cli_session_id: String, cwd: Option<String>) -> Result<(), String> {
+    let valid = !cli_session_id.is_empty()
+        && cli_session_id.len() <= 128
+        && cli_session_id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
+    if !valid {
+        return Err("invalid session id".into());
+    }
+    let dir = cwd
+        .map(PathBuf::from)
+        .filter(|p| p.is_dir())
+        .or_else(platform::home)
+        .ok_or_else(|| "no folder to open".to_string())?;
+    let (program, args) = platform::terminal_launch(&dir, &cli_session_id);
+    std::process::Command::new(program)
+        .args(args)
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| format!("could not open a terminal: {e}"))
 }

@@ -73,6 +73,10 @@ pub struct SavedSession {
     pub mode: String,
     pub model: Option<String>,
     pub preset: Option<String>,
+    #[serde(default)]
+    pub effort: Option<String>,
+    #[serde(default)]
+    pub web_search: bool,
     pub updated_at: u64,
 }
 
@@ -156,6 +160,8 @@ mod tests {
             mode: "code".into(),
             model: None,
             preset: None,
+            effort: None,
+            web_search: false,
             updated_at: t,
         }
     }

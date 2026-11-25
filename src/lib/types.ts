@@ -75,6 +75,8 @@ export interface StartOptions {
   no_tools?: boolean;
   extra_args?: string[];
   preset?: string | null;
+  web_search?: boolean;
+  effort?: string | null;
 }
 
 export type ChatItem =
@@ -120,6 +122,8 @@ export interface SavedSession {
   mode: Mode;
   model: string | null;
   preset: string | null;
+  effort: string | null;
+  web_search: boolean;
   updated_at: number;
 }
 

@@ -27,6 +27,7 @@ pub fn run() {
             commands::pending_permissions,
             commands::list_features,
             commands::list_presets,
+            commands::open_in_terminal,
             commands::read_config_file,
             commands::write_config_file,
             commands::run_cli,

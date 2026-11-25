@@ -164,6 +164,12 @@ The parser, broker and registry were written test-first with a RED run observed.
 - Tauri `dragDropEnabled` is false so HTML5 file drops reach the page.
 - E2E: `node tools/e2e.mjs [attach|caps]`. The `caps` scenario temporarily sets your tier to Intermediate and restores it.
 
+## 10f. Chat power-ups (session 2, later)
+- **Bug found and fixed:** `--tools ""` only disables BUILT-IN tools. The user's MCP servers (e.g. GitHub, browser control) stayed available in Chat. Chat now also passes `--strict-mcp-config` (verified: 0 tools, or exactly WebFetch+WebSearch with web search on). If you add other restricted modes, remember this.
+- `--effort low|medium|high|xhigh|max` is validated in Rust (`is_effort`) before being passed.
+- "Continue in terminal" (`platform::terminal_launch`): Windows `cmd /C start`, macOS `osascript` (Terminal), Linux `x-terminal-emulator`. Only the Windows path has been exercised (and only its argument construction in tests: it was not launched live). macOS/Linux paths are unverified.
+- Command palette is data-driven (`palette.ts`, items built in `+page.svelte`); add actions there.
+
 ## 11. Next steps (in order)
 0. PRs #2 and #3 are merged (M2-M4 + UI polish). The owner confirmed Code and Chat work in `tauri dev`; presets, resume and Settings still deserve a manual click-through.
 1. **Merge PR #1** (CI green) and tag `v0.0.1-alpha`; record release-build size/RAM in PROGRESS.md.
