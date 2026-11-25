@@ -180,6 +180,12 @@ The parser, broker and registry were written test-first with a RED run observed.
 - Dictation (`dictation.ts`): WebView2 exposes `webkitSpeechRecognition` (probed with `node tools/e2e.mjs probe`). Real recognition was NOT exercised: it may need microphone permission and an internet speech service. Clicking the mic in an automated run could raise an OS permission prompt, so tests do not click it.
 - Dev-only gotcha for browser test scripts: with Vite HMR, `import("/src/lib/store.svelte.ts")` from `page.evaluate` can return a different module instance than the app's; drive the UI instead (the Tauri E2E scenarios are unaffected).
 
+## 10i. E2E safety rules (learned the hard way)
+- The Tauri E2E scenarios (`node tools/e2e.mjs [attach|caps|chat|projects|probe]`) run against the developer's REAL app data (`%APPDATA%/better-claude-ui`, `~/.claude`) and the real CLI. They must never delete anything they did not create.
+- Incident (2026-11-25): a first version of the cleanup compared "recents now" against a snapshot taken before the app had finished loading its config, so it treated every saved conversation as test data and deleted two real ones. They were rebuilt from the CLI's own session files (`~/.claude/projects/<folder>/<id>.jsonl`), which is a useful recovery path: the CLI keeps its own copy of every session.
+- Rule now: `tidy()` in `tools/e2e.mjs` only forgets conversations whose `cliSessionId` belongs to a session that is LIVE in the freshly launched app (opened by the test). Never use a before/after diff of saved history. Scenarios that change settings (`tier`, `projects`) restore them in a `finally`.
+- E2E spend still appears in the Usage ledger (it is real spend).
+
 ## 11. Next steps (in order)
 0. PRs #2 and #3 are merged (M2-M4 + UI polish). The owner confirmed Code and Chat work in `tauri dev`; presets, resume and Settings still deserve a manual click-through.
 1. **Merge PR #1** (CI green) and tag `v0.0.1-alpha`; record release-build size/RAM in PROGRESS.md.

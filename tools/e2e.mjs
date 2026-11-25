@@ -32,6 +32,8 @@ async function cleanup(code) {
 }
 const fail = (m) => { console.error("FAIL:", m); cleanup(1); };
 const step = (m) => console.log("•", m);
+// Conversations created by a run are removed again so tests never pollute the real app data.
+let tidy = async () => {};
 
 try {
   for (let i = 0; i < 120 && !browser; i++) {
@@ -45,6 +47,17 @@ try {
   }
   if (!page) throw new Error("app page not found; pages: " + browser.contexts().flatMap((c) => c.pages()).map((p) => p.url()).join(", "));
   page.setDefaultTimeout(90_000);
+  // Only conversations of sessions that are LIVE in this freshly launched app (opened by the test)
+  // are removed. Anything that merely exists in the saved history is never touched.
+  tidy = async () => {
+    await page
+      .evaluate(async () => {
+        const { app } = await import("/src/lib/store.svelte.ts");
+        const mine = new Set(app.metas.map((m) => app.states[m.id]?.cliSessionId).filter(Boolean));
+        for (const r of [...app.config.recents]) if (mine.has(r.cli_session_id)) await app.forget(r);
+      })
+      .catch(() => {});
+  };
   step("attached to app window");
 
   await page.getByRole("heading", { name: "Home" }).waitFor();
@@ -62,6 +75,28 @@ try {
     r.micButton = await page.getByRole("button", { name: "Dictate with your voice" }).isVisible().catch(() => false);
     r.attachButton = await page.getByRole("button", { name: "Attach files" }).isVisible().catch(() => false);
     console.log("PROBE", JSON.stringify(r));
+    await tidy();
+    cleanup(0);
+    await new Promise(() => {});
+  }
+
+  if (scenario === "preview") {
+    await page.evaluate(async () => { const { app } = await import("/src/lib/store.svelte.ts"); app.setMode("chat"); await app.newSession(); });
+    const box = page.getByLabel("Message");
+    await box.fill("BCU-PREVIEW reply with exactly this markdown and nothing else:\n```html\n<h1 id=\"ok\">Hello preview</h1>\n<script>document.body.setAttribute('data-ran','1')</script>\n```");
+    await box.press("Enter");
+    await page.getByRole("button", { name: "Send" }).waitFor();
+    step("reply with an html block received");
+    await page.getByRole("button", { name: "Preview", exact: true }).first().click(); // real click, no force: nothing may overlap it
+    const frame = page.frameLocator('iframe[title="Preview of the code block"]');
+    const heading = await frame.locator("#ok").innerText();
+    step("preview rendered: " + heading);
+    if (heading !== "Hello preview") throw new Error("preview did not render");
+    const ran = await frame.locator("body").getAttribute("data-ran");
+    if (ran !== null) throw new Error("a script ran inside the sandboxed preview!");
+    step("embedded script did not run; sandbox=" + JSON.stringify(await page.locator('iframe[title="Preview of the code block"]').getAttribute("sandbox")));
+    await tidy();
+    console.log("E2E PREVIEW PASSED");
     cleanup(0);
     await new Promise(() => {});
   }
@@ -109,6 +144,7 @@ try {
       }, [before, sessionId]).catch(() => {});
     }
     console.log("E2E PROJECTS PASSED");
+    await tidy();
     cleanup(0);
     await new Promise(() => {});
   }
@@ -137,7 +173,7 @@ try {
       step("palette: 'new chat' started a chat");
 
       // Turn on web search before the first message (restarts the empty session with new flags).
-      await page.getByLabel("Web search").check();
+      await page.getByLabel("Web search", { exact: true }).check();
       await page.waitForFunction(async () => { const { app } = await import("/src/lib/store.svelte.ts"); return app.activeMeta?.webSearch === true; });
       step("web search enabled before first message (fresh restart path)");
 
@@ -167,6 +203,7 @@ try {
       await restore();
     }
     console.log("E2E CHAT PASSED");
+    await tidy();
     cleanup(0);
     await new Promise(() => {});
   }
@@ -235,6 +272,7 @@ try {
       await restore();
     }
     console.log("E2E CAPS PASSED");
+    await tidy();
     cleanup(0);
     await new Promise(() => {});
   }
@@ -260,6 +298,7 @@ try {
     step(`reply: ${reply.trim()}`);
     if (!reply.includes("red") || !reply.includes("pineapple")) throw new Error("model did not see both attachments");
     console.log("E2E ATTACH PASSED");
+    await tidy();
     cleanup(0);
     await new Promise(() => {});
   }
@@ -295,7 +334,9 @@ try {
   step(`transcript shows ${toolCards} tool card(s)`);
 
   console.log("E2E PASSED");
+  await tidy();
   cleanup(0);
 } catch (e) {
+  await tidy();
   fail(e?.message ?? String(e));
 }
