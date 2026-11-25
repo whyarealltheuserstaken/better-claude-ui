@@ -14,7 +14,7 @@ Legend: [x] done · [~] in progress · [ ] todo
 - [x] T9 UI shell + session store
 - [x] T10 Message list / markdown / tool cards
 - [x] T11 Composer + permission prompt UI
-- [~] T12 E2E + manual verification done (real-CLI smoke + app E2E pass); release build/size and tag v0.0.1-alpha pending
+- [x] T12 E2E + verification: real-CLI smoke + app E2E pass; release build OK (installer 1.57 MB, window 0.39 s, ~147 MB idle private RAM, misses <100 MB target); tagged v0.0.1-alpha
 
 ## Later
 - [ ] M2 Chat mode + session list/resume + model/mode switching
