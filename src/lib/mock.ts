@@ -73,6 +73,8 @@ export async function mockInvoke<T>(cmd: string, args?: Record<string, unknown>)
       return undefined as T;
     case "run_cli":
       return { code: 0, output: "mock: " + (args!.args as string[]).join(" ") } as T;
+    case "open_in_terminal":
+      return undefined as T;
     case "list_presets":
       return [{ id: "deep-research", title: "Deep Research", description: "Mock preset", cost_note: "Costs more", agents: { researcher: { description: "r", prompt: "p" } }, system_prompt: "s", custom: false }] as T;
     case "get_config":

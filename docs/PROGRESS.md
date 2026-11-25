@@ -47,8 +47,11 @@ Legend: [x] done · [~] in progress · [ ] todo
 - [x] Capabilities panel: MCP servers (status, add, remove, health), skills, agents, plugins, tools
 - [x] Instructions and settings editors: project/user CLAUDE.md, project/user settings.json (Advanced), JSON-validated with .bak backups
 - Verified in the real app: `node tools/e2e.mjs caps`
+- [x] Chat web search (Chat limited to exactly WebSearch + WebFetch), thinking-effort picker, copy message, export conversation as Markdown, Ctrl+K command palette, "Continue in terminal" escape hatch
+- [x] Fixed: Chat is now truly tool-free (`--strict-mcp-config`); `--tools` alone left the user's MCP tools available. Verified on the real CLI.
+- [x] Model/permission/effort changes before the first message now just restart the empty session
+- Verified in the real app: `node tools/e2e.mjs chat`
 - [ ] Projects (named instructions + folder), conversation search, artifact preview, voice dictation
-- [ ] Embedded terminal fallback (Advanced)
 
 ## M5b — Setup wizard, themes, styles
 - [x] In-app setup wizard: detects missing CLI and signed-out state; runs the official installer and `claude auth login` on explicit click, streaming output

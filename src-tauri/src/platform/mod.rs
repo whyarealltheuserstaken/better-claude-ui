@@ -1,6 +1,6 @@
 //! All OS-specific behaviour lives here. Nothing outside this module may use `cfg(windows)` etc.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 pub const APP_DIR_NAME: &str = "better-claude-ui";
 
@@ -62,6 +62,73 @@ pub fn installer_command() -> InstallerCommand {
             ],
             display: "curl -fsSL https://claude.ai/install.sh | bash",
         }
+    }
+}
+
+/// Quote a string for inclusion inside an AppleScript double-quoted string.
+pub fn applescript_quote(s: &str) -> String {
+    s.replace('\\', "\\\\").replace('"', "\\\"")
+}
+
+/// POSIX single-quote a string for a shell command line.
+pub fn sh_quote(s: &str) -> String {
+    format!("'{}'", s.replace('\'', "'\\''"))
+}
+
+/// Program and arguments that open the user's terminal in `cwd` running
+/// `claude --resume <id>`. `id` must already be validated (letters, digits, - and _).
+pub fn terminal_launch(cwd: &Path, id: &str) -> (String, Vec<String>) {
+    let dir = cwd.to_string_lossy().to_string();
+    #[cfg(windows)]
+    {
+        (
+            "cmd".into(),
+            [
+                "/C",
+                "start",
+                "BetterClaudeUI",
+                "/D",
+                dir.as_str(),
+                "cmd",
+                "/K",
+                "claude",
+                "--resume",
+                id,
+            ]
+            .map(String::from)
+            .to_vec(),
+        )
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let script = format!(
+            "tell application \"Terminal\" to do script \"cd {} && claude --resume {}\"",
+            applescript_quote(&sh_quote(&dir)),
+            applescript_quote(id)
+        );
+        (
+            "osascript".into(),
+            vec![
+                "-e".into(),
+                script,
+                "-e".into(),
+                "tell application \"Terminal\" to activate".into(),
+            ],
+        )
+    }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        (
+            "x-terminal-emulator".into(),
+            vec![
+                "-e".into(),
+                "sh".into(),
+                "-c".into(),
+                "cd \"$0\" && exec claude --resume \"$1\"".into(),
+                dir,
+                id.to_string(),
+            ],
+        )
     }
 }
 
@@ -142,6 +209,20 @@ pub fn configure_std_command(cmd: &mut std::process::Command) {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn quoting_helpers_escape_hostile_input() {
+        assert_eq!(super::sh_quote("a'b"), "'a'\\''b'");
+        assert_eq!(super::applescript_quote("a\"b\\c"), "a\\\"b\\\\c");
+    }
+
+    #[test]
+    fn terminal_launch_passes_folder_and_id_as_separate_arguments() {
+        let (prog, args) =
+            super::terminal_launch(std::path::Path::new("/tmp/my project"), "abc-123");
+        assert!(!prog.is_empty());
+        assert!(args.iter().any(|a| a.contains("abc-123")));
+    }
+
     use super::*;
 
     #[test]

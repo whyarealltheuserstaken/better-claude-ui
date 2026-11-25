@@ -1,6 +1,6 @@
 // End-to-end test of the REAL app against the REAL `claude` CLI, driven over WebView2's debug port.
 // Windows: starts `npm run tauri dev` itself. Usage: node tools/e2e.mjs
-// Scenarios: `node tools/e2e.mjs` (permission flow, default), `attach` (image + text attachments in Chat), `caps` (slash menu, capabilities panel, CLAUDE.md editor).
+// Scenarios: `node tools/e2e.mjs` (permission flow, default), `attach` (image + text attachments in Chat), `caps` (slash menu, capabilities panel, CLAUDE.md editor), `chat` (palette, web search in Chat, tool lockdown, export).
 // Uses your claude login (a few cents of tokens). Exits non-zero on failure.
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, rmSync, readFileSync } from "node:fs";
@@ -50,6 +50,64 @@ try {
   await page.getByRole("heading", { name: "Home" }).waitFor();
   step("Home visible, CLI detected");
   await page.getByText(/Claude Code \d/).first().waitFor();
+
+  if (scenario === "chat") {
+    const prevTier = await page.evaluate(async () => {
+      const { app } = await import("/src/lib/store.svelte.ts");
+      const prev = app.config.tier;
+      await app.updateConfig({ tier: "intermediate" });
+      return prev;
+    });
+    const restore = () => page.evaluate(async (t) => { const { app } = await import("/src/lib/store.svelte.ts"); await app.updateConfig({ tier: t }); }, prevTier).catch(() => {});
+    try {
+      // Command palette: Ctrl+K, filter, Enter.
+      await page.keyboard.press("Control+k");
+      const pal = page.getByRole("dialog", { name: "Command palette" });
+      await pal.waitFor();
+      await pal.getByLabel("Search commands").fill("usage");
+      await page.keyboard.press("Enter");
+      await page.getByRole("heading", { name: "Usage" }).waitFor();
+      step("palette: Ctrl+K -> 'usage' -> Usage page");
+      await page.keyboard.press("Control+k");
+      await page.getByLabel("Search commands").fill("new chat");
+      await page.keyboard.press("Enter");
+      await page.getByLabel("Message").waitFor();
+      step("palette: 'new chat' started a chat");
+
+      // Turn on web search before the first message (restarts the empty session with new flags).
+      await page.getByLabel("Web search").check();
+      await page.waitForFunction(async () => { const { app } = await import("/src/lib/store.svelte.ts"); return app.activeMeta?.webSearch === true; });
+      step("web search enabled before first message (fresh restart path)");
+
+      const box = page.getByLabel("Message");
+      await box.fill("Use web search to find the current latest stable Node.js release version number. Reply in one short sentence including the version.");
+      await box.press("Enter");
+      // Answer any permission prompts (web tools go through the permission gate) until the turn ends.
+      for (let i = 0; i < 120; i++) {
+        if (await page.getByRole("button", { name: "Send" }).isVisible().catch(() => false)) break;
+        const allow = page.getByRole("button", { name: "Allow", exact: true });
+        if (await allow.isVisible().catch(() => false)) await allow.click().catch(() => {});
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+      await page.getByRole("button", { name: "Send" }).waitFor();
+      const reply = (await page.locator(".assistant").last().innerText()).trim();
+      step("reply: " + reply.slice(0, 140));
+      if (!/\d+\.\d+/.test(reply)) throw new Error("no version number in reply");
+
+      const tools = await page.evaluate(async () => { const { app } = await import("/src/lib/store.svelte.ts"); return app.active?.caps?.tools ?? null; });
+      step("tools exposed to Chat: " + JSON.stringify(tools));
+      if (!tools || tools.length !== 2 || !tools.includes("WebSearch") || !tools.includes("WebFetch")) throw new Error("Chat is not locked down to web tools: " + JSON.stringify(tools));
+
+      await page.getByRole("button", { name: "Export" }).click();
+      await page.getByText("Conversation copied as Markdown").waitFor();
+      step("export copied the conversation");
+    } finally {
+      await restore();
+    }
+    console.log("E2E CHAT PASSED");
+    cleanup(0);
+    await new Promise(() => {});
+  }
 
   if (scenario === "caps") {
     const prevTier = await page.evaluate(async (cwd) => {

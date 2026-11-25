@@ -1,4 +1,5 @@
 import { type PendingAttachment, composeText, toWire } from "./attachments";
+import { exportMarkdown } from "./export";
 import { ipc, onSessionEvent, pickFolder } from "./ipc";
 import { addUserMessage, initialState, reduce, removePending, restoreItems } from "./reducer";
 import { type Caps, capsFor, normalizeTier } from "./tier";
@@ -12,6 +13,8 @@ export interface SessionMeta {
   model: string | null;
   permissionMode: string | null;
   preset: string | null;
+  effort: string | null;
+  webSearch: boolean;
 }
 
 const folderName = (p: string | null) => (p ? (p.split(/[\\/]/).filter(Boolean).pop() ?? p) : "Session");
@@ -54,6 +57,9 @@ class AppStore {
   showSettings = $state(false);
   showPresets = $state(false);
   showCaps = $state(false);
+  showPalette = $state(false);
+  toast = $state<string | null>(null);
+  private toastTimer: ReturnType<typeof setTimeout> | null = null;
   showEditor = $state(false);
   view = $state<"home" | "session" | "usage">("home");
   limits = $state<LimitsSnapshot | null>(null);
@@ -141,12 +147,43 @@ class AppStore {
     if (!cur || cur.mode !== m) this.activeId = this.metas.filter((x) => x.mode === m).at(-1)?.id ?? null;
   }
 
+  flash(message: string) {
+    this.toast = message;
+    if (this.toastTimer) clearTimeout(this.toastTimer);
+    this.toastTimer = setTimeout(() => (this.toast = null), 2200);
+  }
+
+  async copyText(text: string, what = "Copied") {
+    try {
+      await navigator.clipboard.writeText(text);
+      this.flash(what);
+    } catch {
+      this.error = "Couldn't copy to the clipboard.";
+    }
+  }
+
+  exportActive() {
+    const m = this.activeMeta;
+    const s = this.active;
+    if (m && s) void this.copyText(exportMarkdown(m.title, $state.snapshot(s.items) as ChatItem[]), "Conversation copied as Markdown");
+  }
+
+  async openTerminal() {
+    const s = this.active;
+    if (!s?.cliSessionId) {
+      this.error = "Send a first message, then you can continue this conversation in a terminal.";
+      return;
+    }
+    await ipc.openInTerminal(s.cliSessionId, this.activeMeta?.cwd ?? null).catch((e) => (this.error = String(e)));
+  }
+
   private startOptions(mode: Mode, extra: StartOptions): StartOptions {
     return {
       model: this.config.default_model,
       permission_mode: this.config.default_permission_mode,
       ...extra,
       no_tools: mode === "chat",
+      web_search: mode === "chat" ? (extra.web_search ?? false) : false,
       extra_args: [...(this.caps.extraArgs ? this.config.extra_args : []), ...(extra.extra_args ?? [])],
     };
   }
@@ -170,6 +207,8 @@ class AppStore {
           model: so.model ?? null,
           permissionMode: so.permission_mode ?? null,
           preset: opts.preset ?? null,
+          effort: so.effort ?? null,
+          webSearch: so.web_search ?? false,
         },
       ];
       this.activeId = id;
@@ -189,14 +228,14 @@ class AppStore {
   async resume(r: SavedSession) {
     this.error = null;
     try {
-      const so = this.startOptions(r.mode, { cwd: r.cwd, model: r.model, resume: r.cli_session_id, preset: r.preset });
+      const so = this.startOptions(r.mode, { cwd: r.cwd, model: r.model, resume: r.cli_session_id, preset: r.preset, effort: r.effort, web_search: r.web_search });
       const items = await ipc.loadTranscript(r.cli_session_id);
       const id = await ipc.startSession(so);
       this.states[id] = restoreItems(this.states[id] ?? initialState(), items);
       this.states[id].cliSessionId = r.cli_session_id;
       this.metas = [
         ...this.metas,
-        { id, title: r.title, cwd: r.cwd, mode: r.mode, model: r.model, permissionMode: so.permission_mode ?? null, preset: r.preset },
+        { id, title: r.title, cwd: r.cwd, mode: r.mode, model: r.model, permissionMode: so.permission_mode ?? null, preset: r.preset, effort: r.effort ?? null, webSearch: r.web_search ?? false },
       ];
       this.mode = r.mode;
       this.view = "session";
@@ -212,12 +251,14 @@ class AppStore {
   }
 
   /** Change model / permission mode of a live session by resuming it in a fresh process. */
-  async reconfigure(id: string, change: { model?: string | null; permissionMode?: string | null }) {
+  async reconfigure(id: string, change: { model?: string | null; permissionMode?: string | null; effort?: string | null; webSearch?: boolean }) {
     const meta = this.metas.find((m) => m.id === id);
     const st = this.states[id];
     if (!meta || !st) return;
-    if (!st.cliSessionId) {
-      this.error = "Send a first message before changing this.";
+    // Before the first message there is nothing to resume: just start over with the new settings.
+    const fresh = !st.cliSessionId && st.items.length === 0;
+    if (!st.cliSessionId && !fresh) {
+      this.error = "Wait for the first reply before changing this.";
       return;
     }
     if (st.status === "running") {
@@ -226,20 +267,24 @@ class AppStore {
     }
     const model = change.model !== undefined ? change.model : meta.model;
     const permissionMode = change.permissionMode !== undefined ? change.permissionMode : meta.permissionMode;
+    const effort = change.effort !== undefined ? change.effort : meta.effort;
+    const webSearch = change.webSearch !== undefined ? change.webSearch : meta.webSearch;
     try {
       const newId = await ipc.startSession(
         this.startOptions(meta.mode, {
           cwd: meta.cwd,
           model: model || null,
           permission_mode: permissionMode || null,
-          resume: st.cliSessionId,
+          resume: fresh ? null : st.cliSessionId,
           preset: meta.preset,
+          effort: effort || null,
+          web_search: webSearch,
         }),
       );
       await ipc.stopSession(id).catch(() => {});
-      this.states[newId] = { ...initialState(), ...restoreItems(initialState(), st.items), cliSessionId: st.cliSessionId, cwd: st.cwd };
+      this.states[newId] = { ...initialState(), ...restoreItems(initialState(), st.items), cliSessionId: st.cliSessionId, cwd: st.cwd, info: st.info };
       delete this.states[id];
-      this.metas = this.metas.map((m) => (m.id === id ? { ...m, id: newId, model: model || null, permissionMode: permissionMode || null } : m));
+      this.metas = this.metas.map((m) => (m.id === id ? { ...m, id: newId, model: model || null, permissionMode: permissionMode || null, effort: effort || null, webSearch } : m));
       if (this.activeId === id) this.activeId = newId;
     } catch (e) {
       this.error = String(e);
@@ -259,6 +304,8 @@ class AppStore {
       mode: meta.mode,
       model: meta.model,
       preset: meta.preset,
+      effort: meta.effort,
+      web_search: meta.webSearch,
       updated_at: Date.now(),
     };
     try {

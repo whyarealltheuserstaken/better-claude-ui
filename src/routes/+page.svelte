@@ -2,6 +2,9 @@
   import { onMount } from "svelte";
   import CapabilitiesPanel from "$lib/components/CapabilitiesPanel.svelte";
   import EditorPanel from "$lib/components/EditorPanel.svelte";
+  import Palette from "$lib/components/Palette.svelte";
+  import { allStyles, allThemes } from "$lib/theme";
+  import type { PaletteItem } from "$lib/palette";
   import HomePage from "$lib/components/HomePage.svelte";
   import UsagePage from "$lib/components/UsagePage.svelte";
   import { ipc, openUrl } from "$lib/ipc";
@@ -49,6 +52,45 @@
       resolveStyle(app.config.style, app.config.custom_styles),
     );
   });
+  const paletteItems = $derived.by((): PaletteItem[] => {
+    const items: PaletteItem[] = [
+      { id: "go-home", label: "Home", group: "Go to", keywords: "dashboard widgets", run: () => app.go("home") },
+      { id: "go-chat", label: "Chat", group: "Go to", run: () => app.setMode("chat") },
+      { id: "go-code", label: "Code", group: "Go to", run: () => app.setMode("code") },
+      { id: "go-usage", label: "Usage", group: "Go to", keywords: "tokens cost billing budget limits", run: () => app.go("usage") },
+      { id: "new-chat", label: "New chat", group: "Start", run: () => { app.setMode("chat"); void app.newSession(); } },
+      { id: "new-code", label: "New coding session", group: "Start", keywords: "project folder", run: () => { app.setMode("code"); void app.newSession(); } },
+      { id: "teams", label: "Agent teams", group: "Start", keywords: "preset research coordinator review", run: () => (app.showPresets = true) },
+      { id: "settings", label: "Settings", group: "App", keywords: "preferences appearance tier", run: () => (app.showSettings = true) },
+    ];
+    if (app.tier !== "beginner") {
+      items.push(
+        { id: "caps", label: "Capabilities", group: "App", keywords: "mcp skills plugins tools servers", run: () => (app.showCaps = true) },
+        { id: "editor", label: "Instructions and settings", group: "App", keywords: "claude.md settings.json", run: () => (app.showEditor = true) },
+      );
+    }
+    if (active && active.items.length > 0) {
+      items.push(
+        { id: "export", label: "Export this conversation", group: "Conversation", keywords: "markdown copy", run: () => app.exportActive() },
+        { id: "terminal", label: "Continue in terminal", group: "Conversation", run: () => void app.openTerminal() },
+      );
+    }
+    for (const t of [{ id: "auto", name: "Match system" }, ...allThemes(app.config.custom_themes)])
+      items.push({ id: "theme-" + t.id, label: "Theme: " + t.name, group: "Theme", run: () => void app.updateConfig({ theme: t.id }) });
+    for (const s of allStyles(app.config.custom_styles))
+      items.push({ id: "style-" + s.id, label: "Style: " + s.name, group: "Style", run: () => void app.updateConfig({ style: s.id }) });
+    for (const m of app.metas) items.push({ id: "sess-" + m.id, label: m.title, group: "Open", run: () => app.select(m.id) });
+    for (const r of app.config.recents.slice(0, 30)) items.push({ id: "rec-" + r.cli_session_id, label: r.title, group: "Recent", keywords: r.cwd ?? "", run: () => void app.resume(r) });
+    return items;
+  });
+
+  function onGlobalKey(e: KeyboardEvent) {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+      e.preventDefault();
+      app.showPalette = !app.showPalette;
+    }
+  }
+
   const todayBudget = $derived(budgetState(app.usage?.today.cost_usd ?? 0, app.config.budget_daily_usd));
   const glyph = $derived(resolveStyle(app.config.style, app.config.custom_styles).glyph);
 
@@ -61,6 +103,7 @@
 </script>
 
 <svelte:head><title>BetterClaudeUI</title></svelte:head>
+<svelte:window onkeydown={onGlobalKey} />
 
 {#if !app.cliChecked}
   <main class="center"><p class="muted">Looking for Claude…</p></main>
@@ -102,6 +145,10 @@
         {#if app.view !== "session"}<span class="cwd"></span>{/if}
         {#if todayBudget.level !== "none"}
           <button class="chip" data-level={todayBudget.level} onclick={() => app.go("usage")} title="Today's estimated cost against your daily budget">Today {fmtUsd(app.usage?.today.cost_usd ?? 0)}</button>
+        {/if}
+        {#if app.view === "session" && active && active.items.length > 0}
+          <button class="chip" onclick={() => app.exportActive()} title="Copy this conversation as Markdown">Export</button>
+          <button class="chip" onclick={() => app.openTerminal()} title="Continue this conversation in your own terminal">Terminal</button>
         {/if}
         {#if app.view === "session" && active && active.costUsd > 0}<span class="tier" title="Estimated cost of this session (API prices)">{fmtUsd(active.costUsd)}</span>{/if}
         <span class="tier">{[app.tier, app.view === "session" ? active?.model : null, app.view === "session" && app.activeMeta?.preset ? `team: ${app.activeMeta.preset}` : null].filter(Boolean).join(" · ")}</span>
@@ -153,7 +200,7 @@
             {/each}
           </div>
         {:else}
-          <MessageList items={active.items} diffs={app.caps.diffs} />
+          <MessageList items={active.items} diffs={app.caps.diffs} oncopy={(t) => app.copyText(t)} />
         {/if}
         <div class="dock">
           <div class="column">
@@ -167,6 +214,10 @@
                 permissionMode={app.activeMeta.permissionMode}
                 chat={app.activeMeta.mode === "chat"}
                 models={active.info?.models ?? []}
+                effort={app.activeMeta.effort}
+                webSearch={app.activeMeta.webSearch}
+                oneffort={(e) => app.reconfigure(app.activeMeta!.id, { effort: e })}
+                onweb={(on) => app.reconfigure(app.activeMeta!.id, { webSearch: on })}
                 onmodel={(m) => app.reconfigure(app.activeMeta!.id, { model: m })}
                 onmode={(m) => app.reconfigure(app.activeMeta!.id, { permissionMode: m })}
               />
@@ -192,6 +243,10 @@
   </div>
 {/if}
 
+{#if app.showPalette}
+  <Palette items={paletteItems} onclose={() => (app.showPalette = false)} />
+{/if}
+{#if app.toast}<div class="toast" role="status">{app.toast}</div>{/if}
 {#if app.showCaps}
   <CapabilitiesPanel caps={app.active?.caps ?? null} run={(a) => ipc.runCli(a, app.activeMeta?.cwd ?? null)} onclose={() => (app.showCaps = false)} />
 {/if}
@@ -249,6 +304,18 @@
   }
   .tier::first-letter {
     text-transform: uppercase;
+  }
+  .toast {
+    position: fixed;
+    bottom: 22px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--raised);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 6px 16px;
+    font-size: 13px;
+    z-index: 30;
   }
   .scrollpage {
     flex: 1;

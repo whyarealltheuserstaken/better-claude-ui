@@ -3,18 +3,22 @@
   import type { ChatItem } from "../types";
   import ToolCard from "./ToolCard.svelte";
 
-  let { item, diffs = false }: { item: ChatItem; diffs?: boolean } = $props();
+  import { itemText } from "../export";
+
+  let { item, diffs = false, oncopy }: { item: ChatItem; diffs?: boolean; oncopy?: (text: string) => void } = $props();
 </script>
 
 {#if item.kind === "user"}
-  <div class="user">
+  <div class="user hov">
+    {#if oncopy}<button class="copy" aria-label="Copy message" onclick={() => oncopy(itemText(item))}>Copy</button>{/if}
     <p>{item.text}</p>
     {#if item.attachments && item.attachments.length > 0}
       <div class="atts">{#each item.attachments as a}<span class="att">{a.kind === "image" ? "Image" : a.kind === "pdf" ? "PDF" : "File"}: {a.name}</span>{/each}</div>
     {/if}
   </div>
 {:else if item.kind === "assistant"}
-  <div class="assistant md" class:nested={item.nested} class:streaming={item.streaming}>
+  <div class="assistant md hov" class:nested={item.nested} class:streaming={item.streaming}>
+    {#if oncopy && !item.streaming}<button class="copy" aria-label="Copy reply" onclick={() => oncopy(itemText(item))}>Copy</button>{/if}
     <!-- eslint-disable-next-line svelte/no-at-html-tags -- markdown-it runs with html:false -->
     {@html renderMarkdown(item.text)}
   </div>
@@ -93,6 +97,9 @@
   }
   .user { margin-top: calc(26px * var(--density)); }
   .assistant { margin: calc(10px * var(--density)) 0; }
+  .hov { position: relative; }
+  .copy { position: absolute; top: 4px; right: 6px; opacity: 0; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 0 8px; font-size: 11.5px; color: var(--muted); font-weight: 400; }
+  .hov:hover .copy, .copy:focus-visible { opacity: 1; }
   .atts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
   .att { font-size: 12px; font-weight: 400; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 0 8px; }
 </style>
