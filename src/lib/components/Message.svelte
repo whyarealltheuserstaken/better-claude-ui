@@ -7,7 +7,7 @@
 </script>
 
 {#if item.kind === "user"}
-  <div class="user"><span class="who">You</span><p>{item.text}</p></div>
+  <div class="user"><p>{item.text}</p></div>
 {:else if item.kind === "assistant"}
   <div class="assistant md" class:nested={item.nested} class:streaming={item.streaming}>
     <!-- eslint-disable-next-line svelte/no-at-html-tags -- markdown-it runs with html:false -->
@@ -21,16 +21,15 @@
 
 <style>
   .user {
-    margin: 22px 0 8px;
-    padding-left: 14px;
-    border-left: 3px solid var(--accent);
-  }
-  .who {
-    font-size: 12.5px;
-    color: var(--muted);
+    margin: 26px 0 10px;
+    padding: 10px 14px;
+    background: var(--raised);
+    border-radius: 12px;
+    font-weight: 560;
+    max-width: 88%;
   }
   .user p {
-    margin: 2px 0 0;
+    margin: 0;
     white-space: pre-wrap;
     word-break: break-word;
   }

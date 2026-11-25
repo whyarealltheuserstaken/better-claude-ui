@@ -54,12 +54,19 @@ fn probe(path: &Path) -> CliStatus {
         .stdout(Stdio::piped())
         .stderr(Stdio::null());
     platform::configure_std_command(&mut cmd);
-    let mut child = match cmd.spawn() {
-        Ok(c) => c,
-        Err(e) => {
-            return CliStatus::Unusable {
-                reason: e.to_string(),
-            };
+    let mut attempts = 0;
+    let mut child = loop {
+        match cmd.spawn() {
+            Ok(c) => break c,
+            Err(e) if platform::is_transient_spawn_error(&e) && attempts < 10 => {
+                attempts += 1;
+                std::thread::sleep(Duration::from_millis(30));
+            }
+            Err(e) => {
+                return CliStatus::Unusable {
+                    reason: e.to_string(),
+                };
+            }
         }
     };
     let deadline = Instant::now() + Duration::from_secs(5);

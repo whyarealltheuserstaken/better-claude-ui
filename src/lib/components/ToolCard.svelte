@@ -43,21 +43,25 @@
 
 <style>
   .tool {
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    background: var(--surface);
-    margin: 6px 0;
+    border-left: 2px solid var(--line);
+    margin: 4px 0 4px 2px;
     overflow: hidden;
   }
   .nested {
     margin-left: 22px;
+  }
+  .tool[data-status="running"] {
+    border-left-color: var(--accent);
+  }
+  .tool[data-status="error"] {
+    border-left-color: var(--bad);
   }
   .head {
     display: flex;
     align-items: center;
     gap: 10px;
     width: 100%;
-    padding: 8px 12px;
+    padding: 4px 12px;
     background: none;
     border: 0;
     text-align: left;
@@ -97,8 +101,9 @@
     }
   }
   .body {
-    border-top: 1px solid var(--line);
-    padding: 8px 12px 10px;
+    padding: 4px 12px 10px;
+    background: color-mix(in srgb, var(--surface) 70%, transparent);
+    border-radius: 0 8px 8px 0;
   }
   pre {
     margin: 0;
