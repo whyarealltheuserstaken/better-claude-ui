@@ -5,7 +5,22 @@
 
   import { itemText } from "../export";
 
-  let { item, diffs = false, oncopy }: { item: ChatItem; diffs?: boolean; oncopy?: (text: string) => void } = $props();
+  let {
+    item,
+    diffs = false,
+    oncopy,
+    onpreview,
+  }: { item: ChatItem; diffs?: boolean; oncopy?: (text: string) => void; onpreview?: (code: string, lang: string) => void } = $props();
+
+  // Code block buttons (rendered inside the markdown HTML) are handled by delegation.
+  function onblock(e: MouseEvent) {
+    const btn = (e.target as HTMLElement).closest<HTMLElement>("[data-act]");
+    if (!btn) return;
+    const block = btn.closest(".codeblock");
+    const code = block?.querySelector("pre code")?.textContent ?? "";
+    if (btn.dataset.act === "copy") oncopy?.(code);
+    else if (btn.dataset.act === "preview") onpreview?.(code, block?.querySelector(".lang")?.textContent ?? "html");
+  }
 </script>
 
 {#if item.kind === "user"}
@@ -17,7 +32,8 @@
     {/if}
   </div>
 {:else if item.kind === "assistant"}
-  <div class="assistant md hov" class:nested={item.nested} class:streaming={item.streaming}>
+  <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+  <div class="assistant md hov" class:nested={item.nested} class:streaming={item.streaming} onclick={onblock}>
     {#if oncopy && !item.streaming}<button class="copy" aria-label="Copy reply" onclick={() => oncopy(itemText(item))}>Copy</button>{/if}
     <!-- eslint-disable-next-line svelte/no-at-html-tags -- markdown-it runs with html:false -->
     {@html renderMarkdown(item.text)}

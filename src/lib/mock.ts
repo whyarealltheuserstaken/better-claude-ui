@@ -17,7 +17,9 @@ async function playTurn(id: string, text: string) {
     cli(id, { kind: "text_delta", text: ch, parent_tool_use_id: null });
     await wait(15);
   }
-  cli(id, { kind: "assistant_message", blocks: [{ kind: "text", text: reply }], parent_tool_use_id: null });
+  const art = text.includes("artifact") ? "\n\n```html\n<h1 id=\"ok\">Hello preview</h1>\n<script>document.body.setAttribute('data-ran','1');parent.document.title='pwned'</script>\n```\n" : "";
+  if (art) cli(id, { kind: "text_delta", text: art, parent_tool_use_id: null });
+  cli(id, { kind: "assistant_message", blocks: [{ kind: "text", text: reply + art }], parent_tool_use_id: null });
   cli(id, { kind: "assistant_message", blocks: [{ kind: "tool_use", id: "t" + counter, name: "Write", input: { file_path: "C:\\demo\\project\\notes.txt", content: "hello" } }], parent_tool_use_id: null });
   cli(id, { kind: "permission_request", request_id: "r" + counter, tool: "Write", input: { file_path: "C:\\demo\\project\\notes.txt", content: "hello" }, description: "notes.txt", tool_use_id: "t" + counter });
 }

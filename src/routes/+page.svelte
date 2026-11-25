@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import CapabilitiesPanel from "$lib/components/CapabilitiesPanel.svelte";
   import EditorPanel from "$lib/components/EditorPanel.svelte";
+  import ArtifactPreview from "$lib/components/ArtifactPreview.svelte";
   import ProjectsPanel from "$lib/components/ProjectsPanel.svelte";
   import { pickFolder } from "$lib/ipc";
   import Palette from "$lib/components/Palette.svelte";
@@ -220,7 +221,7 @@
             {/each}
           </div>
         {:else}
-          <MessageList items={active.items} diffs={app.caps.diffs} oncopy={(t) => app.copyText(t)} />
+          <MessageList items={active.items} diffs={app.caps.diffs} oncopy={(t) => app.copyText(t)} onpreview={(code, lang) => (app.preview = { code, lang })} />
         {/if}
         <div class="dock">
           <div class="column">
@@ -265,6 +266,9 @@
 
 {#if app.showPalette}
   <Palette items={paletteItems} search={searchConversations} onclose={() => (app.showPalette = false)} />
+{/if}
+{#if app.preview}
+  <ArtifactPreview code={app.preview.code} lang={app.preview.lang} oncopy={(t) => app.copyText(t, "Code copied")} onclose={() => (app.preview = null)} />
 {/if}
 {#if app.showProjects}
   <ProjectsPanel

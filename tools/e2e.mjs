@@ -51,6 +51,21 @@ try {
   step("Home visible, CLI detected");
   await page.getByText(/Claude Code \d/).first().waitFor();
 
+  if (scenario === "probe") {
+    const r = await page.evaluate(() => ({
+      speech: typeof window.SpeechRecognition !== "undefined" || typeof window.webkitSpeechRecognition !== "undefined",
+      mic: !!navigator.mediaDevices?.getUserMedia,
+      notification: typeof Notification !== "undefined",
+      ua: navigator.userAgent.slice(0, 120),
+    }));
+    await page.evaluate(async (cwd) => { const { app } = await import("/src/lib/store.svelte.ts"); app.setMode("code"); await app.newSession({ cwd }); }, work);
+    r.micButton = await page.getByRole("button", { name: "Dictate with your voice" }).isVisible().catch(() => false);
+    r.attachButton = await page.getByRole("button", { name: "Attach files" }).isVisible().catch(() => false);
+    console.log("PROBE", JSON.stringify(r));
+    cleanup(0);
+    await new Promise(() => {});
+  }
+
   if (scenario === "projects") {
     const before = await page.evaluate(async () => { const { app } = await import("/src/lib/store.svelte.ts"); return JSON.parse(JSON.stringify(app.config.projects)); });
     let sessionId = null;
