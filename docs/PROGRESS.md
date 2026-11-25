@@ -3,13 +3,13 @@
 Legend: [x] done · [~] in progress · [ ] todo
 
 ## M0/M1 — Foundation & core Code mode (plan: `docs/superpowers/plans/2026-11-24-m0-m1-core-foundation.md`)
-- [~] T1 Repo, scaffold, CI, docs
-- [ ] T2 Spike: capture real protocol → `docs/PROTOCOL.md`
-- [ ] T3 Event parser
-- [ ] T4 Platform module + CLI detection
-- [ ] T5 Fake `claude` stub
-- [ ] T6 Session manager
-- [ ] T7 Permission broker
+- [x] T1 Repo, scaffold, CI, docs
+- [x] T2 Spike: capture real protocol → `docs/PROTOCOL.md`
+- [x] T3 Event parser
+- [x] T4 Platform module + CLI detection
+- [x] T5 Fake `claude` stub
+- [x] T6 Session manager
+- [x] T7 Permission broker
 - [ ] T8 Tauri commands + feature registry
 - [ ] T9 UI shell + session store
 - [ ] T10 Message list / markdown / tool cards

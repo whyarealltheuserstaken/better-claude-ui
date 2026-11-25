@@ -39,8 +39,8 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
-      - run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
-      - run: cargo test --manifest-path src-tauri/Cargo.toml
+      - run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --features test-support -- -D warnings
+      - run: cargo test --manifest-path src-tauri/Cargo.toml --features test-support
 
   ui:
     runs-on: ubuntu-latest
