@@ -10,10 +10,10 @@ Legend: [x] done · [~] in progress · [ ] todo
 - [x] T5 Fake `claude` stub
 - [x] T6 Session manager
 - [x] T7 Permission broker
-- [ ] T8 Tauri commands + feature registry
-- [ ] T9 UI shell + session store
-- [ ] T10 Message list / markdown / tool cards
-- [ ] T11 Composer + permission prompt UI
+- [x] T8 Tauri commands + feature registry
+- [x] T9 UI shell + session store
+- [x] T10 Message list / markdown / tool cards
+- [x] T11 Composer + permission prompt UI
 - [ ] T12 E2E + manual verification, tag v0.0.1-alpha
 
 ## Later
