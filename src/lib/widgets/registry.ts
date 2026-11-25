@@ -9,6 +9,7 @@ export interface WidgetDef {
 
 export const WIDGETS: WidgetDef[] = [
   { id: "quick-start", title: "Start something", description: "New chat, new coding session, agent teams.", wide: true },
+  { id: "projects", title: "Projects", description: "Your projects with their standing instructions.", wide: false },
   { id: "limits", title: "Plan usage limits", description: "How much of your 5-hour and weekly allowance is used.", wide: false },
   { id: "spend-today", title: "Today", description: "Today's tokens and estimated cost, with an optional daily budget.", wide: false },
   { id: "spend-month", title: "This month", description: "This month's tokens and estimated cost, with an optional monthly budget.", wide: false },

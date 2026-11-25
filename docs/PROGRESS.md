@@ -51,7 +51,9 @@ Legend: [x] done · [~] in progress · [ ] todo
 - [x] Fixed: Chat is now truly tool-free (`--strict-mcp-config`); `--tools` alone left the user's MCP tools available. Verified on the real CLI.
 - [x] Model/permission/effort changes before the first message now just restart the empty session
 - Verified in the real app: `node tools/e2e.mjs chat`
-- [ ] Projects (named instructions + folder), conversation search, artifact preview, voice dictation
+- [x] Projects: named instructions + optional folder, applied to every conversation started from them (combined with agent-team prompts in one flag); manager panel, Home widget, palette entries. Verified in the real app (`node tools/e2e.mjs projects`)
+- [x] Search conversations by content (Rust full-text over saved transcripts), surfaced in the Ctrl+K palette
+- [ ] Artifact preview (HTML/SVG), voice dictation
 
 ## M5b — Setup wizard, themes, styles
 - [x] In-app setup wizard: detects missing CLI and signed-out state; runs the official installer and `claude auth login` on explicit click, streaming output

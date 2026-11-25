@@ -76,6 +76,8 @@ pub struct StartOptions {
     #[serde(default)]
     pub web_search: bool,
     pub effort: Option<String>,
+    /// Project instructions, appended to the system prompt (max 20,000 characters).
+    pub instructions: Option<String>,
     /// Preset id (see `presets`), resolved to `--agents` + a coordinator system prompt.
     pub preset: Option<String>,
 }
@@ -208,6 +210,13 @@ pub async fn start_session(
         Some(cwd.to_string_lossy().to_string())
     };
     let preset_id = opts.preset.clone();
+    let instructions = opts.instructions.clone();
+    if instructions
+        .as_ref()
+        .is_some_and(|t| t.chars().count() > 20_000)
+    {
+        return Err("project instructions are too long (limit 20,000 characters)".into());
+    }
     let mut extra_args = opts.extra_args;
     if let Some(id) = &opts.preset {
         let all = presets::load_all(&platform::config_dir().join("presets"));
@@ -215,7 +224,11 @@ pub async fn start_session(
             .iter()
             .find(|p| &p.id == id)
             .ok_or_else(|| format!("unknown preset `{id}`"))?;
-        let mut a = presets::cli_args(p);
+        let mut a = presets::cli_args_with(p, instructions.as_deref());
+        a.extend(extra_args);
+        extra_args = a;
+    } else if let Some(text) = instructions.as_deref().filter(|t| !t.trim().is_empty()) {
+        let mut a = vec!["--append-system-prompt".to_string(), text.to_string()];
         a.extend(extra_args);
         extra_args = a;
     }
@@ -540,4 +553,12 @@ pub fn open_in_terminal(cli_session_id: String, cwd: Option<String>) -> Result<(
         .spawn()
         .map(|_| ())
         .map_err(|e| format!("could not open a terminal: {e}"))
+}
+
+/// Search saved conversations by text (user and assistant messages).
+#[tauri::command]
+pub async fn search_conversations(query: String) -> Result<Vec<crate::search::Hit>, String> {
+    tokio::task::spawn_blocking(move || crate::search::search(&platform::config_dir(), &query))
+        .await
+        .map_err(|e| e.to_string())
 }

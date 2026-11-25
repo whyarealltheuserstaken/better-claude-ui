@@ -29,6 +29,8 @@ pub struct AppConfig {
     pub budget_monthly_usd: Option<f64>,
     /// Ordered ids of the widgets shown on the Home page.
     pub home_widgets: Vec<String>,
+    /// Named projects (instructions + optional folder); the UI validates their shape.
+    pub projects: Vec<serde_json::Value>,
 }
 
 impl Default for AppConfig {
@@ -49,6 +51,7 @@ impl Default for AppConfig {
             budget_monthly_usd: None,
             home_widgets: [
                 "quick-start",
+                "projects",
                 "limits",
                 "spend-today",
                 "spend-month",
@@ -60,6 +63,7 @@ impl Default for AppConfig {
             ]
             .map(String::from)
             .to_vec(),
+            projects: vec![],
         }
     }
 }
@@ -77,6 +81,8 @@ pub struct SavedSession {
     pub effort: Option<String>,
     #[serde(default)]
     pub web_search: bool,
+    #[serde(default)]
+    pub project: Option<String>,
     pub updated_at: u64,
 }
 
@@ -162,6 +168,7 @@ mod tests {
             preset: None,
             effort: None,
             web_search: false,
+            project: None,
             updated_at: t,
         }
     }

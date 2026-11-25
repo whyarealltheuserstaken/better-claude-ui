@@ -1,6 +1,6 @@
 // End-to-end test of the REAL app against the REAL `claude` CLI, driven over WebView2's debug port.
 // Windows: starts `npm run tauri dev` itself. Usage: node tools/e2e.mjs
-// Scenarios: `node tools/e2e.mjs` (permission flow, default), `attach` (image + text attachments in Chat), `caps` (slash menu, capabilities panel, CLAUDE.md editor), `chat` (palette, web search in Chat, tool lockdown, export).
+// Scenarios: `node tools/e2e.mjs` (permission flow, default), `attach` (image + text attachments in Chat), `caps` (slash menu, capabilities panel, CLAUDE.md editor), `chat` (palette, web search in Chat, tool lockdown, export), `projects` (project instructions applied to a chat, conversation search).
 // Uses your claude login (a few cents of tokens). Exits non-zero on failure.
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, rmSync, readFileSync } from "node:fs";
@@ -50,6 +50,53 @@ try {
   await page.getByRole("heading", { name: "Home" }).waitFor();
   step("Home visible, CLI detected");
   await page.getByText(/Claude Code \d/).first().waitFor();
+
+  if (scenario === "projects") {
+    const before = await page.evaluate(async () => { const { app } = await import("/src/lib/store.svelte.ts"); return JSON.parse(JSON.stringify(app.config.projects)); });
+    let sessionId = null;
+    try {
+      await page.keyboard.press("Control+k");
+      await page.getByLabel("Search commands").fill("projects");
+      await page.keyboard.press("Enter");
+      const dlg = page.getByRole("dialog", { name: "Projects" });
+      await dlg.waitFor();
+      await dlg.getByLabel("Name").fill("E2E Project");
+      await dlg.getByLabel("Instructions").fill("Always end every reply with the exact word BANANAPHONE on its own line.");
+      await dlg.getByRole("button", { name: "Create project" }).click();
+      await dlg.getByRole("button", { name: "New chat" }).waitFor();
+      step("project created");
+      await dlg.getByRole("button", { name: "New chat" }).click();
+      const box = page.getByLabel("Message");
+      await box.waitFor();
+      await box.fill("Say hello in one short sentence.");
+      await box.press("Enter");
+      await page.getByRole("button", { name: "Send" }).waitFor();
+      const reply = (await page.locator(".assistant").last().innerText()).trim();
+      step("reply: " + reply.replace(/\n/g, " | ").slice(0, 120));
+      if (!reply.includes("BANANAPHONE")) throw new Error("project instructions were not applied");
+      step("project instructions applied to the conversation");
+
+      // Search finds the saved conversation by its content.
+      sessionId = await page.evaluate(async () => { const { app } = await import("/src/lib/store.svelte.ts"); return app.active?.cliSessionId ?? null; });
+      await new Promise((r) => setTimeout(r, 1500)); // transcript is saved on turn end
+      await page.keyboard.press("Control+k");
+      await page.getByLabel("Search commands").fill("bananaphone");
+      const hit = page.getByRole("option").filter({ hasText: "BANANAPHONE".toLowerCase() }).first();
+      await hit.waitFor({ timeout: 15000 });
+      step("palette search found the conversation by content");
+      await page.keyboard.press("Escape");
+    } finally {
+      await page.evaluate(async ([projects, sid]) => {
+        const { app } = await import("/src/lib/store.svelte.ts");
+        await app.updateConfig({ projects });
+        const r = app.config.recents.find((x) => x.cli_session_id === sid);
+        if (r) await app.forget(r);
+      }, [before, sessionId]).catch(() => {});
+    }
+    console.log("E2E PROJECTS PASSED");
+    cleanup(0);
+    await new Promise(() => {});
+  }
 
   if (scenario === "chat") {
     const prevTier = await page.evaluate(async () => {

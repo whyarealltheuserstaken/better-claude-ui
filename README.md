@@ -11,6 +11,7 @@ A lightweight desktop UI for [Claude Code](https://claude.com/claude-code): the 
 - **Experience tiers:** Beginner, Intermediate, Advanced.
 - **Usage and billing tracker:** tokens and estimated cost per day, model and project, plan allowance meters (5-hour and weekly), budgets and alerts.
 - **Home dashboard** with configurable widgets.
+- **Projects** with standing instructions, **search** across conversations, **Ctrl+K command palette**, **web search in Chat**, **attachments**, slash commands, MCP/skills panels, CLAUDE.md and settings editors.
 - **Setup wizard:** detects a missing or signed-out Claude Code and walks you through installing and signing in.
 - **Themes and styles:** 8 themes, 4 styles (including a Terminal look), all editable, importable and exportable.
 - **Multi-agent presets:** Coordinator + Workers, Deep Research, Code + Review.

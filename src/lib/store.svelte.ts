@@ -1,5 +1,6 @@
 import { type PendingAttachment, composeText, toWire } from "./attachments";
 import { exportMarkdown } from "./export";
+import { allProjects, findProject } from "./projects";
 import { ipc, onSessionEvent, pickFolder } from "./ipc";
 import { addUserMessage, initialState, reduce, removePending, restoreItems } from "./reducer";
 import { type Caps, capsFor, normalizeTier } from "./tier";
@@ -15,6 +16,7 @@ export interface SessionMeta {
   preset: string | null;
   effort: string | null;
   webSearch: boolean;
+  project: string | null;
 }
 
 const folderName = (p: string | null) => (p ? (p.split(/[\\/]/).filter(Boolean).pop() ?? p) : "Session");
@@ -34,6 +36,7 @@ const defaultConfig = (): AppConfig => ({
   budget_daily_usd: null,
   budget_monthly_usd: null,
   home_widgets: ["quick-start", "limits", "spend-today", "spend-month", "daily-chart", "by-model", "by-project", "recent", "status"],
+  projects: [],
 });
 
 /** First user message, trimmed, as a human title for a chat. */
@@ -58,6 +61,7 @@ class AppStore {
   showPresets = $state(false);
   showCaps = $state(false);
   showPalette = $state(false);
+  showProjects = $state(false);
   toast = $state<string | null>(null);
   private toastTimer: ReturnType<typeof setTimeout> | null = null;
   showEditor = $state(false);
@@ -177,10 +181,14 @@ class AppStore {
     await ipc.openInTerminal(s.cliSessionId, this.activeMeta?.cwd ?? null).catch((e) => (this.error = String(e)));
   }
 
-  private startOptions(mode: Mode, extra: StartOptions): StartOptions {
+  projects = $derived(allProjects(this.config.projects));
+
+  private startOptions(mode: Mode, extra: StartOptions, projectId: string | null = null): StartOptions {
+    const project = findProject(this.config.projects, projectId);
     return {
       model: this.config.default_model,
       permission_mode: this.config.default_permission_mode,
+      instructions: project?.instructions || null,
       ...extra,
       no_tools: mode === "chat",
       web_search: mode === "chat" ? (extra.web_search ?? false) : false,
@@ -188,20 +196,22 @@ class AppStore {
     };
   }
 
-  async newSession(opts: StartOptions = {}) {
+  async newSession(opts: StartOptions & { projectId?: string | null } = {}) {
     this.error = null;
     const mode = this.mode;
+    const projectId = opts.projectId ?? null;
+    const project = findProject(this.config.projects, projectId);
     try {
-      const cwd = mode === "chat" ? null : (opts.cwd ?? (await pickFolder()));
+      const cwd = mode === "chat" ? null : (opts.cwd ?? project?.cwd ?? (await pickFolder()));
       if (mode === "code" && !cwd) return;
-      const so = this.startOptions(mode, { ...opts, cwd });
+      const so = this.startOptions(mode, { ...opts, cwd }, projectId);
       const id = await ipc.startSession(so);
       this.states[id] ??= initialState();
       this.metas = [
         ...this.metas,
         {
           id,
-          title: mode === "chat" ? "New chat" : folderName(cwd),
+          title: mode === "chat" ? (project ? project.name : "New chat") : folderName(cwd),
           cwd,
           mode,
           model: so.model ?? null,
@@ -209,6 +219,7 @@ class AppStore {
           preset: opts.preset ?? null,
           effort: so.effort ?? null,
           webSearch: so.web_search ?? false,
+          project: project?.id ?? null,
         },
       ];
       this.activeId = id;
@@ -228,14 +239,14 @@ class AppStore {
   async resume(r: SavedSession) {
     this.error = null;
     try {
-      const so = this.startOptions(r.mode, { cwd: r.cwd, model: r.model, resume: r.cli_session_id, preset: r.preset, effort: r.effort, web_search: r.web_search });
+      const so = this.startOptions(r.mode, { cwd: r.cwd, model: r.model, resume: r.cli_session_id, preset: r.preset, effort: r.effort, web_search: r.web_search }, r.project ?? null);
       const items = await ipc.loadTranscript(r.cli_session_id);
       const id = await ipc.startSession(so);
       this.states[id] = restoreItems(this.states[id] ?? initialState(), items);
       this.states[id].cliSessionId = r.cli_session_id;
       this.metas = [
         ...this.metas,
-        { id, title: r.title, cwd: r.cwd, mode: r.mode, model: r.model, permissionMode: so.permission_mode ?? null, preset: r.preset, effort: r.effort ?? null, webSearch: r.web_search ?? false },
+        { id, title: r.title, cwd: r.cwd, mode: r.mode, model: r.model, permissionMode: so.permission_mode ?? null, preset: r.preset, effort: r.effort ?? null, webSearch: r.web_search ?? false, project: r.project ?? null },
       ];
       this.mode = r.mode;
       this.view = "session";
@@ -279,7 +290,7 @@ class AppStore {
           preset: meta.preset,
           effort: effort || null,
           web_search: webSearch,
-        }),
+        }, meta.project),
       );
       await ipc.stopSession(id).catch(() => {});
       this.states[newId] = { ...initialState(), ...restoreItems(initialState(), st.items), cliSessionId: st.cliSessionId, cwd: st.cwd, info: st.info };
@@ -306,6 +317,7 @@ class AppStore {
       preset: meta.preset,
       effort: meta.effort,
       web_search: meta.webSearch,
+      project: meta.project,
       updated_at: Date.now(),
     };
     try {
