@@ -70,7 +70,7 @@ What the owner asked for, in their own terms:
 - Real CLI smoke tests (`--ignored`): simple prompt streams "pong"; permission **deny** blocks the write; **interrupt** ends the turn in ~57 ms.
 - Full app E2E (`node tools/e2e.mjs`): real app + real Claude, driven over WebView2 debug port: permission prompt appears, Allow clicked, file created with expected content, 3 tool cards rendered. PASSED.
 - CI (GitHub Actions) green on windows-latest, macos-latest, ubuntu-latest, and UI job (PR #1).
-- Dev app idle RAM observed ≈ 41 MB (debug build; release not yet measured).
+- **Release build (Windows, measured 2026-11-25):** NSIS installer **1.57 MB**, MSI 2.28 MB, `better-claude-ui.exe` 4.7 MB; main window visible in **0.39 s**; idle memory with 7 processes (app + WebView2 helpers) = **~147 MB private** (main exe alone 26 MB; the naive working-set sum of 342 MB double-counts shared pages). So size and startup beat the targets, but **idle RAM misses the <100 MB target** because WebView2 itself has a floor. Recommendation: relax the target to ≲150 MB (still far below Electron) unless M5 finds savings (e.g. avoid loading highlight.js languages eagerly, trim UI work at idle).
 
 ## 4. How to build, run, test
 
@@ -125,10 +125,11 @@ The parser, broker and registry were written test-first with a RED run observed.
 | E2E attached to wrong window | Lenovo Vantage held port 9222 | private port 9477 + page URL filter |
 | Events could arrive before `start_session` resolved | race in store | store creates state on first event |
 | Fixtures leaked local paths/hook noise | raw captures | `sanitize-fixture.mjs` scrubs paths, drops noisy events |
-| `npm run tauri build` (release) crashed | `rustc` died with `STATUS_STACK_BUFFER_OVERRUN` compiling the `windows` crate at opt-level 3 (first attempt, default jobs) | retry with `CARGO_BUILD_JOBS=2` — **result recorded in PROGRESS.md** |
+| `npm run tauri build` (release) crashed | `rustc` died with `STATUS_STACK_BUFFER_OVERRUN` compiling the `windows` crate at opt-level 3 (first attempt, default jobs, other apps running) | retry with `CARGO_BUILD_JOBS=2` **succeeded** (use this on this machine) |
 
 ## 10. Known issues / risks / unverified
-- **Release build** on the author's Windows machine hit a rustc crash (above). If it recurs: lower jobs, close other apps, or try `opt-level="s"`/`codegen-units` tweaks; check rustc version (1.98.1 used).
+- **Release build** on the author's Windows machine hit a rustc crash once (above); `CARGO_BUILD_JOBS=2` fixed it. If it recurs: lower jobs, close other apps, or try `opt-level="s"`/`codegen-units` tweaks; rustc 1.98.1 used.
+- **Idle RAM target** (<100 MB) is missed on Windows (~147 MB private); see §3.
 - **macOS/Linux:** CI builds and tests pass, but the app has **never been run** on real macOS/Linux hardware. Universal macOS build, Linux packaging (AppImage/.deb), and signing/notarization are unbuilt (M6). Windows installer is unsigned → SmartScreen warning.
 - Parallel subagent output distinguishability (`parent_tool_use_id`) is assumed from the protocol, **not yet verified** with `--agents` (M4 must verify before building Deep Research).
 - Subscription/usage-limit behavior when many agents run is unknown; surface cost/usage in Advanced.
