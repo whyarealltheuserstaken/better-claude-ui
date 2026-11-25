@@ -12,6 +12,17 @@
   import Sidebar from "$lib/components/Sidebar.svelte";
   import { app } from "$lib/store.svelte";
 
+  const CODE_STARTERS = [
+    "Explain what this project does and how it is organised.",
+    "Find likely bugs and list them, without changing anything.",
+    "Suggest three small improvements, then wait for my choice.",
+  ];
+  const CHAT_STARTERS = [
+    "Help me think through a decision.",
+    "Explain something I find confusing.",
+    "Proofread and tighten some writing.",
+  ];
+
   onMount(() => {
     void app.init();
   });
@@ -51,7 +62,10 @@
           <button role="tab" aria-selected={app.mode === "chat"} class:on={app.mode === "chat"} onclick={() => app.setMode("chat")}>Chat</button>
           <button role="tab" aria-selected={app.mode === "code"} class:on={app.mode === "code"} onclick={() => app.setMode("code")}>Code</button>
         </div>
-        <span class="tier">{app.tier}</span>
+        {#if active}
+          <span class="cwd" title={active.cwd ?? ""}>{app.activeMeta?.mode === "chat" ? "No tools in Chat" : (active.cwd ?? "")}</span>
+        {/if}
+        <span class="tier">{[app.tier, active?.model, app.activeMeta?.preset ? `team: ${app.activeMeta.preset}` : null].filter(Boolean).join(" · ")}</span>
       </div>
       {#if app.error}
         <div class="banner" role="alert">
@@ -60,12 +74,16 @@
         </div>
       {/if}
       {#if active}
-        <header>
-          <span class="cwd" title={active.cwd ?? ""}>{app.activeMeta?.mode === "chat" ? "Chat (no tools)" : (active.cwd ?? "")}</span>
-          {#if app.activeMeta?.preset}<span class="model">team: {app.activeMeta.preset}</span>{/if}
-          {#if active.model}<span class="model">{active.model}</span>{/if}
-        </header>
-        <MessageList items={active.items} diffs={app.caps.diffs} />
+        {#if active.items.length === 0}
+          <div class="starters">
+            <h2>{app.activeMeta?.mode === "chat" ? "Ask anything" : "Where should Claude start?"}</h2>
+            {#each app.activeMeta?.mode === "chat" ? CHAT_STARTERS : CODE_STARTERS as s (s)}
+              <button onclick={() => app.send(s)}>{s}</button>
+            {/each}
+          </div>
+        {:else}
+          <MessageList items={active.items} diffs={app.caps.diffs} />
+        {/if}
         <div class="dock">
           <div class="column">
             {#each active.pending as p (p.request_id)}
@@ -149,18 +167,42 @@
   .tier {
     color: var(--muted);
     font-size: 12.5px;
-    text-transform: capitalize;
   }
-  header {
+  .tier::first-letter {
+    text-transform: uppercase;
+  }
+  .starters {
+    flex: 1;
     display: flex;
-    justify-content: space-between;
-    gap: 16px;
-    padding: 10px 24px;
-    border-bottom: 1px solid var(--line);
-    color: var(--muted);
-    font-size: 13px;
+    flex-direction: column;
+    justify-content: center;
+    gap: 8px;
+    max-width: 560px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 24px;
+  }
+  .starters h2 {
+    margin: 0 0 8px;
+    font-size: 22px;
+    letter-spacing: -0.015em;
+  }
+  .starters button {
+    text-align: left;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 11px 14px;
+  }
+  .starters button:hover {
+    border-color: var(--accent);
   }
   .cwd {
+    flex: 1;
+    min-width: 0;
+    margin: 0 18px;
+    color: var(--muted);
+    font-size: 13px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

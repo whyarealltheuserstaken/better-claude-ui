@@ -34,9 +34,9 @@
 </script>
 
 <aside>
-  <div class="brand">BetterClaudeUI</div>
+  <div class="brand">Better<span>Claude</span>UI</div>
   <button class="new" onclick={onnew}>{mode === "chat" ? "New chat" : "New session"}</button>
-  {#if mode === "code"}<button class="presets" onclick={onpresets}>Agent teams…</button>{/if}
+  {#if mode === "code"}<button class="presets" onclick={onpresets}>Agent teams</button>{/if}
   <nav aria-label="Sessions">
     {#each metas as m (m.id)}
       {@const st = states[m.id]}
@@ -80,23 +80,32 @@
   }
   .brand {
     font-weight: 700;
-    letter-spacing: -0.01em;
-    padding: 0 6px;
+    letter-spacing: -0.02em;
+    padding: 2px 6px 4px;
+  }
+  .brand span {
+    color: var(--accent);
   }
   .new {
-    background: var(--accent);
-    color: var(--accent-ink);
-    border: 0;
-    border-radius: 9px;
-    padding: 8px;
-    font-weight: 600;
-  }
-  .presets {
-    background: var(--raised);
+    background: none;
     color: var(--text);
-    border: 1px solid var(--line);
+    border: 1px solid var(--accent);
     border-radius: 9px;
     padding: 7px;
+    font-weight: 600;
+  }
+  .new:hover {
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+  }
+  .presets {
+    background: none;
+    color: var(--muted);
+    border: 0;
+    text-align: left;
+    padding: 2px 6px;
+  }
+  .presets:hover {
+    color: var(--text);
   }
   nav {
     flex: 1;
