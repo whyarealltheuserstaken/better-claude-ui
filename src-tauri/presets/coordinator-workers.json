@@ -1,0 +1,23 @@
+{
+  "id": "coordinator-workers",
+  "title": "Coordinator + Workers",
+  "description": "Claude plans the job, hands pieces to specialist helpers (researcher, coder, reviewer), then merges their results.",
+  "cost_note": "Uses more tokens than a normal session because several helpers each do their own work.",
+  "agents": {
+    "researcher": {
+      "description": "Finds and summarises information in the codebase or on the web. Read-only.",
+      "prompt": "You are a researcher. Investigate the question you are given thoroughly, then reply with a concise, factual summary that names the files or sources you used. Do not modify anything.",
+      "tools": ["Read", "Grep", "Glob", "WebSearch", "WebFetch"]
+    },
+    "coder": {
+      "description": "Implements a clearly specified change in the project.",
+      "prompt": "You are a careful software engineer. Implement exactly the change you are given, keep it small, run relevant tests if any exist, and report what you changed."
+    },
+    "reviewer": {
+      "description": "Reviews finished work for bugs and gaps. Read-only.",
+      "prompt": "You are a strict reviewer. Inspect the work you are pointed at, list concrete problems ordered by severity, and say plainly if you found none. Do not modify anything.",
+      "tools": ["Read", "Grep", "Glob"]
+    }
+  },
+  "system_prompt": "You are the coordinator. Break the request into steps. Delegate research to the `researcher` agent, implementation to the `coder` agent, and checking to the `reviewer` agent. Helpers cannot talk to each other: pass any context a helper needs in your instructions to it, and merge their results yourself. Finish with a short summary for the user."
+}

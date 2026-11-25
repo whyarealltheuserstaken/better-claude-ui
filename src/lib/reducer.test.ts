@@ -104,3 +104,18 @@ describe("reduce", () => {
     expect(s.status).toBe("running");
   });
 });
+
+describe("restoreItems", () => {
+  test("keeps ids unique for new items and settles in-flight work", async () => {
+    const { restoreItems, initialState, addUserMessage } = await import("./reducer");
+    let s = restoreItems(initialState(), [
+      { kind: "user", id: "i1", text: "hi" },
+      { kind: "assistant", id: "i2", text: "yo", streaming: true, nested: false },
+      { kind: "tool", id: "t9", name: "Bash", input: {}, output: null, status: "running", nested: false },
+    ]);
+    expect((s.items[1] as { streaming: boolean }).streaming).toBe(false);
+    expect((s.items[2] as { status: string }).status).toBe("done");
+    s = addUserMessage(s, "next");
+    expect(new Set(s.items.map((i) => i.id)).size).toBe(4);
+  });
+});

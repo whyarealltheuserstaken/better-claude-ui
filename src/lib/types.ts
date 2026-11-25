@@ -63,6 +63,8 @@ export interface StartOptions {
   permission_mode?: string | null;
   resume?: string | null;
   no_tools?: boolean;
+  extra_args?: string[];
+  preset?: string | null;
 }
 
 export type ChatItem =
@@ -91,4 +93,43 @@ export interface SessionState {
   /** Capped log of raw events for Advanced view. */
   raw: SessionEvent[];
   nextId: number;
+}
+
+export type Mode = "code" | "chat";
+
+export interface SavedSession {
+  cli_session_id: string;
+  title: string;
+  cwd: string | null;
+  mode: Mode;
+  model: string | null;
+  preset: string | null;
+  updated_at: number;
+}
+
+export interface AppConfig {
+  tier: "beginner" | "intermediate" | "advanced";
+  onboarded: boolean;
+  default_model: string | null;
+  default_permission_mode: string | null;
+  always_allow: string[];
+  extra_args: string[];
+  recents: SavedSession[];
+}
+
+export interface AgentDef {
+  description: string;
+  prompt: string;
+  tools?: string[];
+  model?: string;
+}
+
+export interface Preset {
+  id: string;
+  title: string;
+  description: string;
+  cost_note: string;
+  agents: Record<string, AgentDef>;
+  system_prompt: string;
+  custom: boolean;
 }

@@ -6,6 +6,7 @@ use crate::config::{self, AppConfig};
 use crate::features::{FeatureInfo, builtin_registry};
 use crate::permissions::{Decision, PendingPermission, PermissionBroker};
 use crate::platform;
+use crate::presets::{self, Preset};
 use crate::session::{SessionEvent, SessionManager, SessionOptions};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -43,6 +44,8 @@ pub struct StartOptions {
     pub no_tools: bool,
     #[serde(default)]
     pub extra_args: Vec<String>,
+    /// Preset id (see `presets`), resolved to `--agents` + a coordinator system prompt.
+    pub preset: Option<String>,
 }
 
 async fn manager(state: &State<'_, AppState>) -> Result<Arc<SessionManager>, String> {
@@ -133,13 +136,24 @@ pub async fn start_session(
             cwd.display()
         ));
     }
+    let mut extra_args = opts.extra_args;
+    if let Some(id) = &opts.preset {
+        let all = presets::load_all(&platform::config_dir().join("presets"));
+        let p = all
+            .iter()
+            .find(|p| &p.id == id)
+            .ok_or_else(|| format!("unknown preset `{id}`"))?;
+        let mut a = presets::cli_args(p);
+        a.extend(extra_args);
+        extra_args = a;
+    }
     m.start(SessionOptions {
         cwd,
         model: opts.model,
         permission_mode: opts.permission_mode,
         resume: opts.resume,
         no_tools: opts.no_tools,
-        extra_args: opts.extra_args,
+        extra_args,
         ..Default::default()
     })
     .await
@@ -251,4 +265,9 @@ pub fn load_transcript(cli_session_id: String) -> Option<String> {
 #[tauri::command]
 pub fn delete_transcript(cli_session_id: String) {
     config::delete_transcript(&platform::config_dir(), &cli_session_id)
+}
+
+#[tauri::command]
+pub fn list_presets() -> Vec<Preset> {
+    presets::load_all(&platform::config_dir().join("presets"))
 }

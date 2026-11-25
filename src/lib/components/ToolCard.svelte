@@ -1,15 +1,16 @@
 <script lang="ts">
-  import { summarizeTool, truncateLines } from "../tools";
+  import { diffLines, summarizeTool, truncateLines } from "../tools";
   import type { ChatItem } from "../types";
 
   type Tool = Extract<ChatItem, { kind: "tool" }>;
-  let { item, maxLines = 200 }: { item: Tool; maxLines?: number } = $props();
+  let { item, maxLines = 200, diffs = false }: { item: Tool; maxLines?: number; diffs?: boolean } = $props();
 
   let open = $state(false);
   let showAll = $state(false);
 
   const summary = $derived(summarizeTool(item.name, item.input));
   const out = $derived(item.output ? truncateLines(item.output, showAll ? Infinity : maxLines) : null);
+  const diff = $derived(diffs ? diffLines(item.name, item.input) : null);
   const detail = $derived(
     typeof item.input.command === "string" ? item.input.command : JSON.stringify(item.input, null, 2),
   );
@@ -24,7 +25,12 @@
   </button>
   {#if open}
     <div class="body">
-      <pre class="in">{detail}</pre>
+      {#if diff}
+        <pre class="diff">{#each diff as l}<span class="l" data-sign={l.sign}>{l.sign} {l.text}</span>
+{/each}</pre>
+      {:else}
+        <pre class="in">{detail}</pre>
+      {/if}
       {#if out}
         <pre class="out">{out.text}</pre>
         {#if out.truncated}
@@ -117,4 +123,7 @@
     color: var(--accent);
     padding: 0;
   }
+  .diff { margin: 0; padding: 8px 12px; font-family: var(--mono); font-size: 12.5px; overflow-x: auto; }
+  .l[data-sign="+"] { color: var(--ok); }
+  .l[data-sign="-"] { color: var(--bad); }
 </style>

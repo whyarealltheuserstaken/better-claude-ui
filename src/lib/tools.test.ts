@@ -39,3 +39,18 @@ describe("truncateLines", () => {
     expect(t.text.split("\n")).toHaveLength(200);
   });
 });
+
+import { diffLines } from "./tools";
+describe("diffLines", () => {
+  test("Edit shows removed then added lines", () => {
+    expect(diffLines("Edit", { old_string: "a\nb", new_string: "c" })).toEqual([
+      { sign: "-", text: "a" },
+      { sign: "-", text: "b" },
+      { sign: "+", text: "c" },
+    ]);
+  });
+  test("Write is all additions; other tools have no diff", () => {
+    expect(diffLines("Write", { content: "x" })).toEqual([{ sign: "+", text: "x" }]);
+    expect(diffLines("Bash", { command: "ls" })).toBeNull();
+  });
+});
