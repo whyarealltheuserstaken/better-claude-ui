@@ -27,6 +27,44 @@ pub fn config_dir() -> PathBuf {
     base.unwrap_or_else(std::env::temp_dir).join(APP_DIR_NAME)
 }
 
+/// The official one-line installer for Claude Code on this OS.
+pub struct InstallerCommand {
+    pub program: &'static str,
+    pub args: Vec<String>,
+    /// What to show the user, so they can see exactly what will run.
+    pub display: &'static str,
+}
+
+pub fn installer_command() -> InstallerCommand {
+    #[cfg(windows)]
+    {
+        InstallerCommand {
+            program: "powershell",
+            args: [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                "irm https://claude.ai/install.ps1 | iex",
+            ]
+            .map(String::from)
+            .to_vec(),
+            display: "irm https://claude.ai/install.ps1 | iex",
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        InstallerCommand {
+            program: "sh",
+            args: vec![
+                "-c".into(),
+                "curl -fsSL https://claude.ai/install.sh | bash".into(),
+            ],
+            display: "curl -fsSL https://claude.ai/install.sh | bash",
+        }
+    }
+}
+
 /// True when spawning failed only because the executable was momentarily open for writing
 /// (Linux `ETXTBSY`); such a spawn is safe to retry shortly after.
 pub fn is_transient_spawn_error(e: &std::io::Error) -> bool {

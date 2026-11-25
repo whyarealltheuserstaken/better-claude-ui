@@ -77,7 +77,7 @@
   button {
     background: var(--raised);
     border: 1px solid var(--line);
-    border-radius: 8px;
+    border-radius: var(--radius-sm);
     padding: 6px 12px;
   }
   .allow {

@@ -17,6 +17,13 @@ pub struct AppConfig {
     /// Advanced: extra CLI args appended to every session.
     pub extra_args: Vec<String>,
     pub recents: Vec<SavedSession>,
+    /// Selected theme id ("auto" follows the system light/dark setting).
+    pub theme: String,
+    /// Selected style id (layout/typography preset).
+    pub style: String,
+    /// User-made themes and styles; the UI validates their shape.
+    pub custom_themes: Vec<serde_json::Value>,
+    pub custom_styles: Vec<serde_json::Value>,
 }
 
 impl Default for AppConfig {
@@ -29,6 +36,10 @@ impl Default for AppConfig {
             always_allow: vec![],
             extra_args: vec![],
             recents: vec![],
+            theme: "auto".into(),
+            style: "modern".into(),
+            custom_themes: vec![],
+            custom_styles: vec![],
         }
     }
 }

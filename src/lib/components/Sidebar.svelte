@@ -90,7 +90,7 @@
     background: none;
     color: var(--text);
     border: 1px solid var(--accent);
-    border-radius: 9px;
+    border-radius: var(--radius);
     padding: 7px;
     font-weight: 600;
   }
@@ -117,7 +117,7 @@
   .row {
     display: flex;
     align-items: center;
-    border-radius: 8px;
+    border-radius: var(--radius-sm);
   }
   .row.active {
     background: var(--raised);
@@ -155,7 +155,7 @@
   .badge {
     background: var(--gate);
     color: var(--gate-ink);
-    border-radius: 999px;
+    border-radius: var(--radius-lg);
     padding: 0 7px;
     font-size: 12px;
     font-weight: 700;

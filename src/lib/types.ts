@@ -115,6 +115,10 @@ export interface AppConfig {
   always_allow: string[];
   extra_args: string[];
   recents: SavedSession[];
+  theme: string;
+  style: string;
+  custom_themes: unknown[];
+  custom_styles: unknown[];
 }
 
 export interface AgentDef {
@@ -133,3 +137,8 @@ export interface Preset {
   system_prompt: string;
   custom: boolean;
 }
+
+export type AuthStatus =
+  | { state: "logged_in"; method: string }
+  | { state: "logged_out" }
+  | { state: "unknown"; reason: string };

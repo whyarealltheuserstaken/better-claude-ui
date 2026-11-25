@@ -23,3 +23,6 @@ The UI reads the list via the `list_features` command. Slots planned: `mode`, `s
 - **Code add-ons:** user-dir manifests, after the registry API has settled.
 
 Keep new features behind the registry so the core stays small.
+
+## Themes and styles
+Both are plain JSON (see `src/lib/theme.ts`). A **theme** is 12 hex colours plus a light/dark base. A **style** is font, size, corner radius, spacing, reading width, user-message look (`bubble`/`bar`/`prompt`), tool-action look (`rail`/`card`/`line`) and a prompt symbol. Users create them in Settings → Appearance (Customize, Export, Import); they are stored in `config.json` (`custom_themes`, `custom_styles`). All input is sanitised (`sanitizeTheme`/`sanitizeStyle`): bad colours fall back, numbers are clamped, font names cannot inject CSS. To ship a new built-in, add it to `BUILTIN_THEMES`/`BUILTIN_STYLES`. Components must use the CSS variables (`--radius*`, `--density`, `--col`, colours), never hardcoded values.

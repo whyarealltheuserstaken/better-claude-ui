@@ -2,6 +2,7 @@
 
 use crate::cli::detect::{self, CliStatus};
 use crate::cli::events::Event;
+use crate::cli::setup::{self, AuthStatus};
 use crate::config::{self, AppConfig};
 use crate::features::{FeatureInfo, builtin_registry};
 use crate::permissions::{Decision, PendingPermission, PermissionBroker};
@@ -12,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, State};
+use tokio::process::Command;
 use tokio::sync::Mutex;
 
 #[derive(Default)]
@@ -270,4 +272,54 @@ pub fn delete_transcript(cli_session_id: String) {
 #[tauri::command]
 pub fn list_presets() -> Vec<Preset> {
     presets::load_all(&platform::config_dir().join("presets"))
+}
+
+/// Is the user signed in to Claude Code? (Uses `claude auth status`.)
+#[tauri::command]
+pub async fn auth_status() -> Result<AuthStatus, String> {
+    tokio::task::spawn_blocking(|| match detect::detect(None) {
+        CliStatus::Found { path, .. } => setup::auth_status(&path),
+        _ => AuthStatus::Unknown {
+            reason: "claude is not installed".into(),
+        },
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+/// What the installer step will run, shown to the user before they confirm.
+#[tauri::command]
+pub fn installer_preview() -> String {
+    platform::installer_command().display.to_string()
+}
+
+/// Run a setup step ("install" or "login") and stream its output as `setup-log` events.
+/// Returns the process exit code. Only ever called from an explicit button in the wizard.
+#[tauri::command]
+pub async fn run_setup_step(app: AppHandle, step: String) -> Result<Option<i32>, String> {
+    let cmd = match step.as_str() {
+        "install" => {
+            let ic = platform::installer_command();
+            let mut c = Command::new(ic.program);
+            c.args(&ic.args);
+            c
+        }
+        "login" => {
+            let CliStatus::Found { path, .. } =
+                tokio::task::spawn_blocking(|| detect::detect(None))
+                    .await
+                    .map_err(|e| e.to_string())?
+            else {
+                return Err("claude is not installed yet".into());
+            };
+            let mut c = Command::new(path);
+            c.args(["auth", "login"]);
+            c
+        }
+        other => return Err(format!("unknown setup step `{other}`")),
+    };
+    setup::run_streaming(cmd, move |line| {
+        let _ = app.emit("setup-log", line);
+    })
+    .await
 }

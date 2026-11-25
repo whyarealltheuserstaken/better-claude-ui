@@ -24,10 +24,10 @@
   .card { width: min(520px, 100%); }
   h1 { font-size: 26px; letter-spacing: -0.015em; margin: 0 0 6px; }
   .lead { color: var(--muted); margin: 0 0 18px; }
-  .tier { display: flex; gap: 12px; padding: 12px 14px; margin-bottom: 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); cursor: pointer; }
+  .tier { display: flex; gap: 12px; padding: 12px 14px; margin-bottom: 8px; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); cursor: pointer; }
   .tier.on { border-color: var(--accent); }
   .tier span { display: flex; flex-direction: column; }
   small { color: var(--muted); }
-  .go { margin-top: 10px; width: 100%; background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 10px; padding: 11px; font-weight: 600; }
+  .go { margin-top: 10px; width: 100%; background: var(--accent); color: var(--accent-ink); border: 0; border-radius: var(--radius); padding: 11px; font-weight: 600; }
   .fine { color: var(--muted); font-size: 12.5px; margin-top: 16px; }
 </style>
