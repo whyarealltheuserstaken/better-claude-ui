@@ -34,6 +34,8 @@ pub enum BrokerError {
 pub struct PermissionBroker {
     pending: HashMap<String, PendingPermission>,
     always: HashSet<(SessionId, String)>,
+    /// Tools the user allowed permanently in Settings (applies to every session).
+    persistent: HashSet<String>,
 }
 
 impl PermissionBroker {
@@ -54,7 +56,9 @@ impl PermissionBroker {
         else {
             return None;
         };
-        if self.always.contains(&(session.to_string(), tool.clone())) {
+        if self.persistent.contains(tool)
+            || self.always.contains(&(session.to_string(), tool.clone()))
+        {
             return Some((
                 request_id.clone(),
                 PermissionReply::Allow {
@@ -74,6 +78,10 @@ impl PermissionBroker {
             },
         );
         None
+    }
+
+    pub fn set_persistent(&mut self, tools: impl IntoIterator<Item = String>) {
+        self.persistent = tools.into_iter().collect();
     }
 
     pub fn pending(&self) -> Vec<PendingPermission> {
@@ -129,6 +137,14 @@ mod tests {
             description: "a.txt".into(),
             tool_use_id: "tu1".into(),
         }
+    }
+
+    #[test]
+    fn persistent_rule_auto_allows_in_any_session() {
+        let mut b = PermissionBroker::new();
+        b.set_persistent(["Read".to_string()]);
+        assert!(b.on_event("s9", &req("r1", "Read")).is_some());
+        assert!(b.on_event("s9", &req("r2", "Write")).is_none());
     }
 
     #[test]

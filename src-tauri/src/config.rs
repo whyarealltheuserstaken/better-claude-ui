@@ -1,0 +1,186 @@
+//! Persistent app settings, recent sessions and saved transcripts (JSON files in the config dir).
+//! Everything here is tolerant: a missing or corrupt file yields defaults, never a crash.
+
+use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct AppConfig {
+    /// "beginner" | "intermediate" | "advanced"
+    pub tier: String,
+    pub onboarded: bool,
+    pub default_model: Option<String>,
+    pub default_permission_mode: Option<String>,
+    /// Tools the user chose to always allow (persisted across sessions).
+    pub always_allow: Vec<String>,
+    /// Advanced: extra CLI args appended to every session.
+    pub extra_args: Vec<String>,
+    pub recents: Vec<SavedSession>,
+}
+
+impl Default for AppConfig {
+    fn default() -> Self {
+        Self {
+            tier: "beginner".into(),
+            onboarded: false,
+            default_model: None,
+            default_permission_mode: None,
+            always_allow: vec![],
+            extra_args: vec![],
+            recents: vec![],
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SavedSession {
+    pub cli_session_id: String,
+    pub title: String,
+    pub cwd: Option<String>,
+    /// "code" | "chat"
+    pub mode: String,
+    pub model: Option<String>,
+    pub preset: Option<String>,
+    pub updated_at: u64,
+}
+
+const MAX_RECENTS: usize = 50;
+
+pub fn config_path(dir: &Path) -> PathBuf {
+    dir.join("config.json")
+}
+
+pub fn load(dir: &Path) -> AppConfig {
+    std::fs::read_to_string(config_path(dir))
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_default()
+}
+
+pub fn save(dir: &Path, cfg: &AppConfig) -> std::io::Result<()> {
+    let mut cfg = cfg.clone();
+    cfg.recents.sort_by_key(|r| std::cmp::Reverse(r.updated_at));
+    cfg.recents.truncate(MAX_RECENTS);
+    std::fs::create_dir_all(dir)?;
+    let tmp = dir.join("config.json.tmp");
+    std::fs::write(&tmp, serde_json::to_vec_pretty(&cfg)?)?;
+    std::fs::rename(tmp, config_path(dir))
+}
+
+fn safe_id(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() <= 128
+        && id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+}
+
+fn transcript_path(dir: &Path, id: &str) -> Option<PathBuf> {
+    safe_id(id).then(|| dir.join("transcripts").join(format!("{id}.json")))
+}
+
+pub fn save_transcript(dir: &Path, id: &str, json: &str) -> std::io::Result<()> {
+    let p = transcript_path(dir, id).ok_or_else(|| {
+        std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid session id")
+    })?;
+    serde_json::from_str::<serde_json::Value>(json)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+    std::fs::create_dir_all(p.parent().unwrap())?;
+    std::fs::write(p, json)
+}
+
+pub fn load_transcript(dir: &Path, id: &str) -> Option<String> {
+    std::fs::read_to_string(transcript_path(dir, id)?).ok()
+}
+
+pub fn delete_transcript(dir: &Path, id: &str) {
+    if let Some(p) = transcript_path(dir, id) {
+        let _ = std::fs::remove_file(p);
+    }
+}
+
+/// Scratch working directory for Chat mode (created on demand).
+pub fn chat_scratch_dir(dir: &Path) -> std::io::Result<PathBuf> {
+    let p = dir.join("chat");
+    std::fs::create_dir_all(&p)?;
+    Ok(p)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn tmp(name: &str) -> PathBuf {
+        let p = std::env::temp_dir().join(format!("bcu-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&p);
+        p
+    }
+
+    fn sess(id: &str, t: u64) -> SavedSession {
+        SavedSession {
+            cli_session_id: id.into(),
+            title: id.into(),
+            cwd: None,
+            mode: "code".into(),
+            model: None,
+            preset: None,
+            updated_at: t,
+        }
+    }
+
+    #[test]
+    fn missing_or_corrupt_file_gives_defaults() {
+        let d = tmp("missing");
+        assert_eq!(load(&d), AppConfig::default());
+        std::fs::create_dir_all(&d).unwrap();
+        std::fs::write(config_path(&d), "{not json").unwrap();
+        assert_eq!(load(&d), AppConfig::default());
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn partial_file_fills_defaults_and_unknown_keys_are_ignored() {
+        let d = tmp("partial");
+        std::fs::create_dir_all(&d).unwrap();
+        std::fs::write(config_path(&d), r#"{"tier":"advanced","future_key":1}"#).unwrap();
+        let c = load(&d);
+        assert_eq!(c.tier, "advanced");
+        assert!(!c.onboarded);
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn save_roundtrips_sorts_and_caps_recents() {
+        let d = tmp("roundtrip");
+        let mut c = AppConfig {
+            tier: "intermediate".into(),
+            always_allow: vec!["Read".into()],
+            ..Default::default()
+        };
+        c.recents = (0..60).map(|i| sess(&format!("s{i}"), i)).collect();
+        save(&d, &c).unwrap();
+        let back = load(&d);
+        assert_eq!(back.tier, "intermediate");
+        assert_eq!(back.always_allow, vec!["Read".to_string()]);
+        assert_eq!(back.recents.len(), MAX_RECENTS);
+        assert_eq!(back.recents[0].cli_session_id, "s59");
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn transcripts_roundtrip_and_reject_unsafe_ids() {
+        let d = tmp("transcript");
+        save_transcript(&d, "abc-123", r#"[{"kind":"user"}]"#).unwrap();
+        assert_eq!(
+            load_transcript(&d, "abc-123").unwrap(),
+            r#"[{"kind":"user"}]"#
+        );
+        assert!(save_transcript(&d, "../evil", "[]").is_err());
+        assert!(save_transcript(&d, "ok", "not json").is_err());
+        assert!(load_transcript(&d, "a/b").is_none());
+        delete_transcript(&d, "abc-123");
+        assert!(load_transcript(&d, "abc-123").is_none());
+        let _ = std::fs::remove_dir_all(&d);
+    }
+}

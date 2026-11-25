@@ -2,8 +2,10 @@
 
 use crate::cli::detect::{self, CliStatus};
 use crate::cli::events::Event;
+use crate::config::{self, AppConfig};
 use crate::features::{FeatureInfo, builtin_registry};
 use crate::permissions::{Decision, PendingPermission, PermissionBroker};
+use crate::platform;
 use crate::session::{SessionEvent, SessionManager, SessionOptions};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -39,6 +41,8 @@ pub struct StartOptions {
     pub resume: Option<String>,
     #[serde(default)]
     pub no_tools: bool,
+    #[serde(default)]
+    pub extra_args: Vec<String>,
 }
 
 async fn manager(state: &State<'_, AppState>) -> Result<Arc<SessionManager>, String> {
@@ -115,11 +119,14 @@ pub async fn start_session(
     opts: StartOptions,
 ) -> Result<String, String> {
     let m = manager(&state).await?;
-    let cwd = opts
-        .cwd
-        .map(PathBuf::from)
-        .or_else(|| std::env::current_dir().ok())
-        .unwrap_or_else(std::env::temp_dir);
+    let cwd = match (opts.cwd, opts.no_tools) {
+        (Some(c), _) => PathBuf::from(c),
+        // Chat mode has no project: use a private scratch directory.
+        (None, true) => {
+            config::chat_scratch_dir(&platform::config_dir()).map_err(|e| e.to_string())?
+        }
+        (None, false) => std::env::current_dir().unwrap_or_else(|_| std::env::temp_dir()),
+    };
     if !cwd.is_dir() {
         return Err(format!(
             "working directory does not exist: {}",
@@ -132,6 +139,7 @@ pub async fn start_session(
         permission_mode: opts.permission_mode,
         resume: opts.resume,
         no_tools: opts.no_tools,
+        extra_args: opts.extra_args,
         ..Default::default()
     })
     .await
@@ -206,4 +214,41 @@ pub async fn pending_permissions(
 #[tauri::command]
 pub fn list_features() -> Vec<FeatureInfo> {
     builtin_registry().list().to_vec()
+}
+
+#[tauri::command]
+pub async fn get_config(state: State<'_, AppState>) -> Result<AppConfig, String> {
+    let cfg = config::load(&platform::config_dir());
+    state
+        .broker
+        .lock()
+        .await
+        .set_persistent(cfg.always_allow.clone());
+    Ok(cfg)
+}
+
+#[tauri::command]
+pub async fn set_config(state: State<'_, AppState>, config: AppConfig) -> Result<(), String> {
+    state
+        .broker
+        .lock()
+        .await
+        .set_persistent(config.always_allow.clone());
+    config::save(&platform::config_dir(), &config).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn save_transcript(cli_session_id: String, json: String) -> Result<(), String> {
+    config::save_transcript(&platform::config_dir(), &cli_session_id, &json)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn load_transcript(cli_session_id: String) -> Option<String> {
+    config::load_transcript(&platform::config_dir(), &cli_session_id)
+}
+
+#[tauri::command]
+pub fn delete_transcript(cli_session_id: String) {
+    config::delete_transcript(&platform::config_dir(), &cli_session_id)
 }
