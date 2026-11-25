@@ -65,7 +65,8 @@ Legend: [x] done · [~] in progress · [ ] todo
 ## M5 — Polish and release
 - [x] Visual polish pass (PR #3)
 - [x] Strict production CSP (ADR 0002); release build verified: NSIS 1.63 MB, MSI 2.35 MB, UI renders with zero CSP/console errors
-- [ ] README screenshots
-- [ ] Re-measure idle RAM; decide on relaxing the <100 MB target (WebView2 floor ~147 MB)
-- [ ] Release workflow + v0.1.0 tag (Windows first)
+- [x] README screenshots (docs/screenshots, demo data)
+- [x] Idle RAM re-measured: ~157 MB (7 processes); the <100 MB target is not achievable with WebView2 and is retired
+- [x] Release workflow + docs/RELEASING.md written (never run)
+- [ ] Tag and publish v0.1.0 (owner decision)
 - [ ] M6 macOS (universal) + Linux release artifacts
