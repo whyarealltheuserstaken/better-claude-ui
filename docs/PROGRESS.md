@@ -38,5 +38,10 @@ Legend: [x] done · [~] in progress · [ ] todo
 - [ ] In-app preset editor (Intermediate+); for now users add JSON files to `<config>/presets/`
 
 ## Later
-- [ ] M5 Polish, installer, README screenshots, tighten CSP, v0.1.0 (Windows)
+## M5 — Polish and release
+- [x] Visual polish pass (PR #3)
+- [x] Strict production CSP (ADR 0002); release build verified: NSIS 1.63 MB, MSI 2.35 MB, UI renders with zero CSP/console errors
+- [ ] README screenshots
+- [ ] Re-measure idle RAM; decide on relaxing the <100 MB target (WebView2 floor ~147 MB)
+- [ ] Release workflow + v0.1.0 tag (Windows first)
 - [ ] M6 macOS (universal) + Linux release artifacts
