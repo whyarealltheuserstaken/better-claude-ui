@@ -109,7 +109,7 @@ Rust core spawns one `claude -p --input-format stream-json --output-format strea
 - Long transcripts: render a recent window of 150 items with "Show earlier" instead of full virtualization [medium: very long single messages still render fully].
 - Batched plan tasks T2–T11 into two PRs instead of one PR per task [low].
 - Permission "always allow" is **in-memory per session** (persisted rules arrive with settings in M3) [low].
-- CSP is currently `null` in `tauri.conf.json` (markdown renders with `html:false`, so no raw HTML injection) [medium: tighten before release; see Next steps].
+- CSP is strict in production, `null` only for dev (ADR 0002).
 - Chat mode will reuse the CLI with `--tools ""`; no API-key mode in v1 [medium: some claude.ai Chat features won't exist].
 
 ## 8. TDD honesty
@@ -146,9 +146,9 @@ The parser, broker and registry were written test-first with a RED run observed.
 - Tooling gotchas: Python is not installed; use Node for scripted edits. npm registry needs a non-restricted network.
 
 ## 11. Next steps (in order)
-0. Merge PR #2, manually click through the new features, fix what breaks.
+0. PRs #2 and #3 are merged (M2-M4 + UI polish). The owner confirmed Code and Chat work in `tauri dev`; presets, resume and Settings still deserve a manual click-through.
 1. **Merge PR #1** (CI green) and tag `v0.0.1-alpha`; record release-build size/RAM in PROGRESS.md.
-2. **Tighten CSP** in `src-tauri/tauri.conf.json` (`csp` for prod, `devCsp` null) and confirm release build + E2E still pass.
+2. ~~Tighten CSP~~ done (ADR 0002); release build smoke-tested under it.
 3. **M2:** model/permission-mode pickers (pass via `StartOptions`; `--model`, `--permission-mode`), session persistence + resume (`--resume`), **Chat mode** (`no_tools: true`, scratch cwd, mode switch in the header, registered as a `Feature`), slash-command list via the `initialize` control request.
 4. **M3:** settings store (`platform::config_dir()`), tier switch (Beginner/Intermediate/Advanced) gating UI per design §8, onboarding, persisted always-allow rules, diff viewer for Edit/Write.
 5. **M4:** presets as data files → generate `--agents` JSON + appended system prompt; **first verify** parallel subagents and event attribution against the real CLI; Deep Research must write a cited report file.
