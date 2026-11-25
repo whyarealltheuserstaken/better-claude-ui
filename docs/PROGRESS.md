@@ -53,7 +53,8 @@ Legend: [x] done · [~] in progress · [ ] todo
 - Verified in the real app: `node tools/e2e.mjs chat`
 - [x] Projects: named instructions + optional folder, applied to every conversation started from them (combined with agent-team prompts in one flag); manager panel, Home widget, palette entries. Verified in the real app (`node tools/e2e.mjs projects`)
 - [x] Search conversations by content (Rust full-text over saved transcripts), surfaced in the Ctrl+K palette
-- [ ] Artifact preview (HTML/SVG), voice dictation
+- [x] Artifact preview for HTML/SVG code blocks: sandboxed (no permissions) frame plus a restrictive CSP inside the document; verified in Edge that a script tag does not run and cannot touch the app. Static only: interactive/JS apps are intentionally not run
+- [x] Voice dictation via the webview speech API (mic button appears only where supported). **Not tested with real speech** (needs a microphone and OS speech services); error messages are unit-tested
 
 ## M5b — Setup wizard, themes, styles
 - [x] In-app setup wizard: detects missing CLI and signed-out state; runs the official installer and `claude auth login` on explicit click, streaming output

@@ -17,7 +17,9 @@ async function playTurn(id: string, text: string) {
     cli(id, { kind: "text_delta", text: ch, parent_tool_use_id: null });
     await wait(15);
   }
-  cli(id, { kind: "assistant_message", blocks: [{ kind: "text", text: reply }], parent_tool_use_id: null });
+  const art = text.includes("artifact") ? "\n\n```html\n<h1 id=\"ok\">Hello preview</h1>\n<script>document.body.setAttribute('data-ran','1');parent.document.title='pwned'</script>\n```\n" : "";
+  if (art) cli(id, { kind: "text_delta", text: art, parent_tool_use_id: null });
+  cli(id, { kind: "assistant_message", blocks: [{ kind: "text", text: reply + art }], parent_tool_use_id: null });
   cli(id, { kind: "assistant_message", blocks: [{ kind: "tool_use", id: "t" + counter, name: "Write", input: { file_path: "C:\\demo\\project\\notes.txt", content: "hello" } }], parent_tool_use_id: null });
   cli(id, { kind: "permission_request", request_id: "r" + counter, tool: "Write", input: { file_path: "C:\\demo\\project\\notes.txt", content: "hello" }, description: "notes.txt", tool_use_id: "t" + counter });
 }
@@ -25,10 +27,10 @@ async function playTurn(id: string, text: string) {
 export async function mockInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   switch (cmd) {
     case "cli_status":
-      return (localStorage.getItem("mock_setup") === "missing" ? { state: "not_found" } : { state: "found", path: "claude (mock)", version: "mock" }) as T;
+      return (localStorage.getItem("mock_setup") === "missing" ? { state: "not_found" } : { state: "found", path: "claude (mock)", version: "2.1.332" }) as T;
     case "start_session": {
       const id = "m" + ++counter;
-      setTimeout(() => cli(id, { kind: "initialized", info: { commands: [{ name: "review", description: "Review a pull request" }, { name: "init", description: "Create a CLAUDE.md for this project" }, { name: "compact", description: "Summarize the conversation to free up context" }, { name: "security-review", description: "Review pending changes for security issues" }], agents: [], models: [{ value: "default", display_name: "Default (recommended)", description: "" }, { value: "opus", display_name: "Opus 5.5", description: "" }, { value: "sonnet", display_name: "Sonnet 5.5", description: "" }, { value: "haiku", display_name: "Haiku 5.5", description: "" }], output_styles: ["default"], version: "mock" } }), 10);
+      setTimeout(() => cli(id, { kind: "initialized", info: { commands: [{ name: "review", description: "Review a pull request" }, { name: "init", description: "Create a CLAUDE.md for this project" }, { name: "compact", description: "Summarize the conversation to free up context" }, { name: "security-review", description: "Review pending changes for security issues" }], agents: [], models: [{ value: "default", display_name: "Default (recommended)", description: "" }, { value: "opus", display_name: "Opus 5.5", description: "" }, { value: "sonnet", display_name: "Sonnet 5.5", description: "" }, { value: "haiku", display_name: "Haiku 5.5", description: "" }], output_styles: ["default"], version: "2.1.332" } }), 10);
       setTimeout(() => cli(id, { kind: "session_init", session_id: "cli-" + id, model: "claude-sonnet-5-5", cwd: "C:\\demo\\project", caps: { slash_commands: ["review", "init", "compact", "security-review", "superpowers:brainstorming"], skills: ["frontend-design:frontend-design", "superpowers:brainstorming"], agents: ["claude", "Explore"], tools: ["Bash", "Read", "Edit"], mcp_servers: [{ name: "github", status: "connected" }, { name: "chrome-devtools", status: "failed" }], plugins: ["superpowers"], version: "2.1.332" } }), 50);
       return id as T;
     }

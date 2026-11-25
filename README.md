@@ -4,6 +4,14 @@ A lightweight desktop UI for [Claude Code](https://claude.com/claude-code): the 
 
 > **Unofficial.** BetterClaudeUI is an independent open-source project. It is not affiliated with or endorsed by Anthropic. It requires the official `claude` CLI, installed and logged in.
 
+## Screenshots
+| | |
+|---|---|
+| ![Home dashboard](docs/screenshots/home.png) | ![Usage and billing](docs/screenshots/usage.png) |
+| ![Terminal style](docs/screenshots/terminal-style.png) | ![Slash commands](docs/screenshots/slash-commands.png) |
+
+_(Screenshots use demo data.)_
+
 ## Why
 - **Full fidelity:** it drives the real CLI (streaming JSON mode), so hooks, skills, plugins, MCP, subagents and slash commands all work, and new CLI features arrive for free.
 - **Light:** Tauri + Rust, not Electron.
@@ -18,7 +26,9 @@ A lightweight desktop UI for [Claude Code](https://claude.com/claude-code): the 
 - **Extensible:** features, presets and themes are modules/data files (see `docs/EXTENDING.md`).
 
 ## Status
-Early development. See [`docs/PROGRESS.md`](docs/PROGRESS.md) for the roadmap and [`docs/HANDOFF.md`](docs/HANDOFF.md) for the current state.
+Pre-release (0.1.0 candidate). Windows is the tested platform; macOS and Linux builds pass CI but have not been run on real hardware. Installers are unsigned. See [`docs/RELEASING.md`](docs/RELEASING.md).
+
+Roadmap and current state: See [`docs/PROGRESS.md`](docs/PROGRESS.md) for the roadmap and [`docs/HANDOFF.md`](docs/HANDOFF.md) for the current state.
 
 Platforms: Windows 10/11 first; macOS (Intel + Apple Silicon, universal) and Linux to follow.
 

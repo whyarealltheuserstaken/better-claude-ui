@@ -62,6 +62,7 @@ class AppStore {
   showCaps = $state(false);
   showPalette = $state(false);
   showProjects = $state(false);
+  preview = $state<{ code: string; lang: string } | null>(null);
   toast = $state<string | null>(null);
   private toastTimer: ReturnType<typeof setTimeout> | null = null;
   showEditor = $state(false);

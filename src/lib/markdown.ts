@@ -13,6 +13,7 @@ import rust from "highlight.js/lib/languages/rust";
 import typescript from "highlight.js/lib/languages/typescript";
 import xml from "highlight.js/lib/languages/xml";
 import yaml from "highlight.js/lib/languages/yaml";
+import { isPreviewable } from "./preview";
 
 const langs: Record<string, Parameters<typeof hljs.registerLanguage>[1]> = {
   bash, css, diff, go, javascript, json, markdown: markdownLang, powershell, python, rust, typescript, xml, yaml,
@@ -37,6 +38,17 @@ const md: InstanceType<typeof MarkdownIt> = new MarkdownIt({
     return `<pre class="code"><code class="hljs">${body}</code></pre>`;
   },
 });
+
+// Every fenced block gets a small bar: language, Copy, and Preview for HTML/SVG.
+// Clicks are handled by delegation in Message.svelte via the data-act attributes.
+type FenceRule = NonNullable<typeof md.renderer.rules.fence>;
+const baseFence: FenceRule = md.renderer.rules.fence as FenceRule;
+md.renderer.rules.fence = (tokens, idx, options, env, self) => {
+  const lang = tokens[idx].info.trim().split(/\s+/)[0] ?? "";
+  const label = md.utils.escapeHtml(lang || "text");
+  const preview = isPreviewable(lang) ? '<button type="button" data-act="preview">Preview</button>' : "";
+  return `<div class="codeblock"><div class="codebar"><span class="lang">${label}</span><span class="acts"><button type="button" data-act="copy">Copy</button>${preview}</span></div>${baseFence(tokens, idx, options, env, self)}</div>`;
+};
 
 // Links open externally and never navigate the app window.
 type LinkRule = NonNullable<typeof md.renderer.rules.link_open>;

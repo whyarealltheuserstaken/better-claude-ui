@@ -1,6 +1,7 @@
 <script lang="ts">
   import { type PendingAttachment, canAdd, fmtSize, fromFile } from "../attachments";
   import { completeCommand, slashMatches, slashQuery } from "../slash";
+  import { type Dictation, createDictation, dictationSupported, mergeTranscript } from "../dictation";
   import type { SessionStatus } from "../types";
 
   let {
@@ -25,6 +26,25 @@
   let dragging = $state(false);
   let picker: HTMLInputElement | undefined = $state();
   let sel = $state(0);
+  let listening = $state(false);
+  let voice: Dictation | null = null;
+  let voiceBase = "";
+  const canDictate = dictationSupported();
+
+  function toggleVoice() {
+    problem = null;
+    if (listening) {
+      voice?.stop();
+      return;
+    }
+    voiceBase = text;
+    voice ??= createDictation({
+      onText: (fin, interim) => (text = mergeTranscript(voiceBase, fin, interim)),
+      onState: (on) => (listening = on),
+      onError: (m) => (problem = m),
+    });
+    voice?.start();
+  }
   let dismissed = $state<string | null>(null);
 
   const query = $derived(slashQuery(text));
@@ -139,6 +159,9 @@
   {/if}
   <div class="row">
     {#if glyph}<span class="glyph" aria-hidden="true">{glyph}</span>{/if}
+    {#if canDictate}
+      <button class="attach" class:live={listening} onclick={toggleVoice} disabled={disabled} aria-pressed={listening} aria-label={listening ? "Stop dictation" : "Dictate with your voice"} title={listening ? "Stop dictation" : "Dictate with your voice"}>{listening ? "■" : "🎤"}</button>
+    {/if}
     <button class="attach" onclick={() => picker?.click()} disabled={disabled} aria-label="Attach files" title="Attach images, PDFs or text files (or paste or drop them)">+</button>
     <input bind:this={picker} type="file" multiple hidden accept="image/*,.pdf,text/*,.md,.json,.js,.ts,.tsx,.jsx,.py,.rs,.go,.java,.c,.cpp,.cs,.rb,.php,.html,.css,.svelte,.yaml,.yml,.toml,.sh,.csv,.log,.xml,.sql" onchange={(e) => { void addFiles([...(e.currentTarget.files ?? [])]); e.currentTarget.value = ""; }} />
     <textarea
@@ -172,6 +195,7 @@
   .stop { background: var(--raised); color: var(--text); border: 1px solid var(--line); }
   .attach { background: var(--raised); color: var(--text); padding: 6px 12px; font-size: 16px; line-height: 1; border: 1px solid var(--line); }
   .attach:disabled { opacity: 0.4; }
+  .attach.live { background: var(--bad); color: #fff; border-color: transparent; }
   .chips { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
   .chip { display: flex; align-items: center; gap: 6px; background: var(--raised); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 3px 4px 3px 6px; font-size: 12.5px; max-width: 240px; }
   .chip img { width: 22px; height: 22px; object-fit: cover; border-radius: 3px; }

@@ -175,6 +175,11 @@ The parser, broker and registry were written test-first with a RED run observed.
 - The new "projects" Home widget is in the default list; users who already customised their widgets must enable it via Customize.
 - Search (`search.rs`) scans `<config>/transcripts/*.json` (user + assistant text only, newest first, 30 hits). Transcripts are saved at the end of each turn.
 
+## 10h. Artifact preview and dictation (session 2, later)
+- Code blocks get a Copy bar (all) and Preview (html/svg). Preview uses `<iframe sandbox="" srcdoc>` AND a CSP meta tag injected by `preview.ts` (default-src 'none'; img-src data:). Do not add `allow-scripts`/`allow-same-origin` without a fresh threat review: previews render model output.
+- Dictation (`dictation.ts`): WebView2 exposes `webkitSpeechRecognition` (probed with `node tools/e2e.mjs probe`). Real recognition was NOT exercised: it may need microphone permission and an internet speech service. Clicking the mic in an automated run could raise an OS permission prompt, so tests do not click it.
+- Dev-only gotcha for browser test scripts: with Vite HMR, `import("/src/lib/store.svelte.ts")` from `page.evaluate` can return a different module instance than the app's; drive the UI instead (the Tauri E2E scenarios are unaffected).
+
 ## 11. Next steps (in order)
 0. PRs #2 and #3 are merged (M2-M4 + UI polish). The owner confirmed Code and Chat work in `tauri dev`; presets, resume and Settings still deserve a manual click-through.
 1. **Merge PR #1** (CI green) and tag `v0.0.1-alpha`; record release-build size/RAM in PROGRESS.md.
