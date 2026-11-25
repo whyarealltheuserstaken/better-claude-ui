@@ -11,5 +11,5 @@
 
 <style>
   .raw { margin-top: 8px; font-size: 12px; color: var(--muted); }
-  pre { max-height: 220px; overflow: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px; font-family: var(--mono); white-space: pre-wrap; word-break: break-all; }
+  pre { max-height: 220px; overflow: auto; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 8px; font-family: var(--mono); white-space: pre-wrap; word-break: break-all; }
 </style>

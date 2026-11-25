@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Appearance from "./Appearance.svelte";
   import { MODELS, PERMISSION_MODES, TIERS, splitArgs, type Tier } from "../tier";
   import type { AppConfig } from "../types";
 
@@ -36,6 +37,11 @@
           <span><strong>{t.label}</strong><small>{t.blurb}</small></span>
         </label>
       {/each}
+    </section>
+
+    <section>
+      <h3>Appearance</h3>
+      <Appearance {config} {onsave} />
     </section>
 
     {#if config.tier !== "beginner"}
@@ -82,7 +88,7 @@
 
 <style>
   .scrim { position: fixed; inset: 0; background: rgb(0 0 0 / 0.5); display: grid; place-items: center; z-index: 10; }
-  .panel { width: min(560px, 92vw); max-height: 86vh; overflow: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px 22px; }
+  .panel { width: min(620px, 94vw); max-height: 86vh; overflow: auto; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 18px 22px; }
   header { display: flex; justify-content: space-between; align-items: center; }
   h2 { margin: 0; font-size: 18px; }
   h3 { margin: 18px 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
@@ -91,8 +97,8 @@
   .opt span { display: flex; flex-direction: column; }
   small { color: var(--muted); }
   .row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; }
-  select, input.mono { background: var(--raised); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; font: inherit; }
+  select, input.mono { background: var(--raised); color: var(--text); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 6px 8px; font: inherit; }
   input.mono { width: 100%; font-family: var(--mono); margin-bottom: 4px; }
   .chips { display: flex; gap: 6px; flex-wrap: wrap; }
-  .chip { background: var(--raised); color: var(--text); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; }
+  .chip { background: var(--raised); color: var(--text); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 3px 10px; }
 </style>

@@ -38,16 +38,16 @@
 
 <style>
   .scrim { position: fixed; inset: 0; background: rgb(0 0 0 / 0.5); display: grid; place-items: center; z-index: 10; }
-  .panel { width: min(640px, 94vw); max-height: 88vh; overflow: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px 22px; }
+  .panel { width: min(640px, 94vw); max-height: 88vh; overflow: auto; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 18px 22px; }
   header { display: flex; justify-content: space-between; align-items: center; }
   h2 { margin: 0; font-size: 18px; }
   .x { background: none; border: 0; color: var(--muted); font-size: 22px; }
   .lead { color: var(--muted); }
-  article { border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; margin-top: 12px; background: var(--bg); }
+  article { border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 12px 16px; margin-top: 12px; background: var(--bg); }
   h3 { margin: 0 0 4px; font-size: 15px; }
   article p { margin: 4px 0; }
   .cost, .team { color: var(--muted); font-size: 12.5px; }
-  .tag { margin-left: 8px; font-size: 11px; color: var(--accent); border: 1px solid var(--accent); border-radius: 999px; padding: 0 7px; }
-  pre { max-height: 200px; overflow: auto; font-family: var(--mono); font-size: 12px; white-space: pre-wrap; background: var(--surface); padding: 8px; border-radius: 8px; }
-  .go { margin-top: 8px; background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 9px; padding: 7px 16px; font-weight: 600; }
+  .tag { margin-left: 8px; font-size: 11px; color: var(--accent); border: 1px solid var(--accent); border-radius: var(--radius-lg); padding: 0 7px; }
+  pre { max-height: 200px; overflow: auto; font-family: var(--mono); font-size: 12px; white-space: pre-wrap; background: var(--surface); padding: 8px; border-radius: var(--radius-sm); }
+  .go { margin-top: 8px; background: var(--accent); color: var(--accent-ink); border: 0; border-radius: var(--radius); padding: 7px 16px; font-weight: 600; }
 </style>

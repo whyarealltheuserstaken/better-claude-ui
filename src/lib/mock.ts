@@ -25,7 +25,7 @@ async function playTurn(id: string, text: string) {
 export async function mockInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   switch (cmd) {
     case "cli_status":
-      return { state: "found", path: "claude (mock)", version: "mock" } as T;
+      return (localStorage.getItem("mock_setup") === "missing" ? { state: "not_found" } : { state: "found", path: "claude (mock)", version: "mock" }) as T;
     case "start_session": {
       const id = "m" + ++counter;
       setTimeout(() => cli(id, { kind: "session_init", session_id: "cli-" + id, model: "claude-sonnet-5-5", cwd: "C:\\demo\\project" }), 50);
@@ -40,10 +40,16 @@ export async function mockInvoke<T>(cmd: string, args?: Record<string, unknown>)
       cli(sid, { kind: "turn_result", is_error: false, result: "done", cost_usd: 0.01, session_id: "cli-" + sid });
       return undefined as T;
     }
+    case "auth_status":
+      return (localStorage.getItem("mock_setup") === "loggedout" ? { state: "logged_out" } : { state: "logged_in", method: "claude.ai" }) as T;
+    case "installer_preview":
+      return "irm https://claude.ai/install.ps1 | iex" as T;
+    case "run_setup_step":
+      return 0 as T;
     case "list_presets":
       return [{ id: "deep-research", title: "Deep Research", description: "Mock preset", cost_note: "Costs more", agents: { researcher: { description: "r", prompt: "p" } }, system_prompt: "s", custom: false }] as T;
     case "get_config":
-      return JSON.parse(localStorage.getItem("mock_config") ?? "null") ?? { tier: "beginner", onboarded: false, default_model: null, default_permission_mode: null, always_allow: [], extra_args: [], recents: [] } as T;
+      return JSON.parse(localStorage.getItem("mock_config") ?? "null") ?? { tier: "beginner", onboarded: false, default_model: null, default_permission_mode: null, always_allow: [], extra_args: [], recents: [], theme: "auto", style: "modern", custom_themes: [], custom_styles: [] } as T;
     case "set_config":
       localStorage.setItem("mock_config", JSON.stringify(args!.config));
       return undefined as T;

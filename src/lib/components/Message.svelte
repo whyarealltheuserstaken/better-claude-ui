@@ -24,7 +24,7 @@
     margin: 26px 0 10px;
     padding: 10px 14px;
     background: var(--raised);
-    border-radius: 12px;
+    border-radius: var(--radius-lg);
     font-weight: 560;
     max-width: 88%;
   }
@@ -68,4 +68,24 @@
     color: var(--bad);
     border-color: color-mix(in srgb, var(--bad) 45%, var(--line));
   }
+  :global(:root[data-user="bar"]) .user {
+    background: none;
+    border-radius: 0;
+    border-left: 3px solid var(--accent);
+    padding: 2px 0 2px 14px;
+    max-width: none;
+  }
+  :global(:root[data-user="prompt"]) .user {
+    background: none;
+    border-radius: 0;
+    padding: 0;
+    max-width: none;
+    font-weight: 600;
+    color: var(--accent);
+  }
+  :global(:root[data-user="prompt"]) .user p::before {
+    content: "❯ ";
+  }
+  .user { margin-top: calc(26px * var(--density)); }
+  .assistant { margin: calc(10px * var(--density)) 0; }
 </style>

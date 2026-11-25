@@ -1,7 +1,7 @@
 import { ipc, onSessionEvent, pickFolder } from "./ipc";
 import { addUserMessage, initialState, reduce, removePending, restoreItems } from "./reducer";
 import { type Caps, capsFor, normalizeTier } from "./tier";
-import type { AppConfig, ChatItem, Preset, CliStatus, Mode, SavedSession, SessionState, StartOptions } from "./types";
+import type { AppConfig, AuthStatus, ChatItem, Preset, CliStatus, Mode, SavedSession, SessionState, StartOptions } from "./types";
 
 export interface SessionMeta {
   id: string;
@@ -23,6 +23,10 @@ const defaultConfig = (): AppConfig => ({
   always_allow: [],
   extra_args: [],
   recents: [],
+  theme: "auto",
+  style: "modern",
+  custom_themes: [],
+  custom_styles: [],
 });
 
 /** First user message, trimmed, as a human title for a chat. */
@@ -45,6 +49,8 @@ class AppStore {
   error = $state<string | null>(null);
   showSettings = $state(false);
   showPresets = $state(false);
+  auth = $state<AuthStatus | null>(null);
+  authSkipped = $state(false);
   presets = $state<Preset[]>([]);
   private unlisten: (() => void) | null = null;
 
@@ -82,6 +88,11 @@ class AppStore {
       this.cli = { state: "unusable", reason: String(e) };
     }
     this.cliChecked = true;
+    if (this.cli.state === "found") await this.checkAuth();
+  }
+
+  async checkAuth() {
+    this.auth = await ipc.authStatus().catch((e) => ({ state: "unknown" as const, reason: String(e) }));
   }
 
   async updateConfig(patch: Partial<AppConfig>) {

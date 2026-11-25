@@ -50,5 +50,5 @@
 <style>
   .bar { display: flex; gap: 16px; padding: 0 2px 8px; font-size: 12.5px; color: var(--muted); }
   label { display: flex; gap: 6px; align-items: center; }
-  select { background: var(--raised); color: var(--text); border: 1px solid var(--line); border-radius: 7px; padding: 3px 6px; font: inherit; }
+  select { background: var(--raised); color: var(--text); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 3px 6px; font: inherit; }
 </style>

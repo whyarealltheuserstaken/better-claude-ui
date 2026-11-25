@@ -45,7 +45,7 @@
     padding: 8px 24px 24px;
   }
   .column {
-    max-width: 780px;
+    max-width: var(--col, 780px);
     margin: 0 auto;
   }
   .earlier {
@@ -53,7 +53,7 @@
     margin: 12px auto;
     background: var(--surface);
     border: 1px solid var(--line);
-    border-radius: 999px;
+    border-radius: var(--radius-lg);
     padding: 4px 14px;
     color: var(--muted);
   }

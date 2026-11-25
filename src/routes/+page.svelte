@@ -8,7 +8,8 @@
   import Composer from "$lib/components/Composer.svelte";
   import MessageList from "$lib/components/MessageList.svelte";
   import PermissionPrompt from "$lib/components/PermissionPrompt.svelte";
-  import SetupScreen from "$lib/components/SetupScreen.svelte";
+  import SetupWizard from "$lib/components/SetupWizard.svelte";
+  import { applyAppearance, resolveStyle, resolveTheme } from "$lib/theme";
   import Sidebar from "$lib/components/Sidebar.svelte";
   import { app } from "$lib/store.svelte";
 
@@ -27,6 +28,27 @@
     void app.init();
   });
 
+  let systemDark = $state(typeof matchMedia === "function" && matchMedia("(prefers-color-scheme: dark)").matches);
+  onMount(() => {
+    if (typeof matchMedia !== "function") return;
+    const mq = matchMedia("(prefers-color-scheme: dark)");
+    const on = () => (systemDark = mq.matches);
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  });
+  $effect(() => {
+    applyAppearance(
+      document.documentElement,
+      resolveTheme(app.config.theme, app.config.custom_themes, systemDark),
+      resolveStyle(app.config.style, app.config.custom_styles),
+    );
+  });
+  const glyph = $derived(resolveStyle(app.config.style, app.config.custom_styles).glyph);
+
+  const needsSetup = $derived(
+    !!app.cli && (app.cli.state !== "found" || (!app.authSkipped && app.auth !== null && app.auth.state !== "logged_in")),
+  );
+
   const version = $derived(app.cli?.state === "found" ? app.cli.version : null);
   const active = $derived(app.active);
 </script>
@@ -35,8 +57,8 @@
 
 {#if !app.cliChecked}
   <main class="center"><p class="muted">Looking for Claude…</p></main>
-{:else if app.cli && app.cli.state !== "found"}
-  <SetupScreen status={app.cli} oncheck={(p) => app.checkCli(p)} />
+{:else if app.cli && needsSetup}
+  <SetupWizard cli={app.cli} auth={app.auth} oncheck={(p) => app.checkCli(p)} onrecheck={() => app.checkAuth()} onskip={() => (app.authSkipped = true)} />
 {:else if !app.config.onboarded}
   <Onboarding ondone={(t) => app.updateConfig({ tier: t, onboarded: true })} />
 {:else}
@@ -99,7 +121,7 @@
                 onmode={(m) => app.reconfigure(app.activeMeta!.id, { permissionMode: m })}
               />
             {/if}
-            <Composer status={active.status} onsend={(t) => app.send(t)} oninterrupt={() => app.interrupt()} />
+            <Composer status={active.status} {glyph} onsend={(t) => app.send(t)} oninterrupt={() => app.interrupt()} />
             {#if app.caps.rawLog}<RawLog events={active.raw} />{/if}
           </div>
         </div>
@@ -149,13 +171,13 @@
     display: inline-flex;
     background: var(--surface);
     border: 1px solid var(--line);
-    border-radius: 9px;
+    border-radius: var(--radius);
     padding: 2px;
   }
   .seg button {
     background: none;
     border: 0;
-    border-radius: 7px;
+    border-radius: var(--radius-sm);
     padding: 4px 16px;
     color: var(--muted);
     font-weight: 600;
@@ -191,7 +213,7 @@
     text-align: left;
     background: var(--surface);
     border: 1px solid var(--line);
-    border-radius: 10px;
+    border-radius: var(--radius);
     padding: 11px 14px;
   }
   .starters button:hover {
@@ -214,7 +236,7 @@
     padding: 0 24px 18px;
   }
   .column {
-    max-width: 780px;
+    max-width: var(--col, 780px);
     margin: 0 auto;
   }
   .empty {
@@ -235,7 +257,7 @@
     background: var(--accent);
     color: var(--accent-ink);
     border: 0;
-    border-radius: 10px;
+    border-radius: var(--radius);
     padding: 10px 22px;
     font-weight: 600;
   }

@@ -131,4 +131,28 @@
   .diff { margin: 0; padding: 8px 12px; font-family: var(--mono); font-size: 12.5px; overflow-x: auto; }
   .l[data-sign="+"] { color: var(--ok); }
   .l[data-sign="-"] { color: var(--bad); }
+  :global(:root[data-tool="card"]) .tool {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    margin: calc(6px * var(--density)) 0;
+  }
+  :global(:root[data-tool="card"]) .head {
+    padding: 8px 12px;
+  }
+  :global(:root[data-tool="line"]) .tool {
+    border-left: 0;
+    margin: 0;
+  }
+  :global(:root[data-tool="line"]) .head {
+    padding: 1px 0;
+  }
+  :global(:root[data-tool="line"]) .summary::before {
+    content: "$ ";
+    color: var(--muted);
+  }
+  :global(:root[data-tool="line"]) .body {
+    padding-left: 14px;
+    border-radius: 0;
+  }
 </style>

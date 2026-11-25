@@ -3,9 +3,10 @@
 
   let {
     status,
+    glyph = "",
     onsend,
     oninterrupt,
-  }: { status: SessionStatus; onsend: (text: string) => void; oninterrupt: () => void } = $props();
+  }: { status: SessionStatus; glyph?: string; onsend: (text: string) => void; oninterrupt: () => void } = $props();
 
   let text = $state("");
   const running = $derived(status === "running");
@@ -29,6 +30,7 @@
 </script>
 
 <div class="composer">
+  {#if glyph}<span class="glyph" aria-hidden="true">{glyph}</span>{/if}
   <textarea
     bind:value={text}
     onkeydown={onkey}
@@ -52,10 +54,15 @@
     padding: 10px;
     background: var(--surface);
     border: 1px solid var(--line);
-    border-radius: 14px;
+    border-radius: var(--radius-lg);
   }
   .composer:focus-within {
     border-color: var(--accent);
+  }
+  .glyph {
+    color: var(--accent);
+    font-weight: 700;
+    padding: 4px 0 4px 4px;
   }
   textarea {
     flex: 1;
@@ -69,7 +76,7 @@
     padding: 4px 6px;
   }
   button {
-    border-radius: 9px;
+    border-radius: var(--radius);
     border: 0;
     padding: 8px 18px;
     font-weight: 600;

@@ -145,6 +145,12 @@ The parser, broker and registry were written test-first with a RED run observed.
 - Config lives in `<config_dir>/config.json`; transcripts in `transcripts/`; user presets in `presets/*.json`.
 - Tooling gotchas: Python is not installed; use Node for scripted edits. npm registry needs a non-restricted network.
 
+## 10c. Setup wizard, themes, styles (session 2, later)
+- `cli/setup.rs`: `auth_status` (parses `claude auth status`), `run_streaming` (installer/login output -> `setup-log` events). Installer command per OS is in `platform::installer_command` (official `claude.ai/install` scripts). Commands: `auth_status`, `installer_preview`, `run_setup_step`.
+- UI: `SetupWizard.svelte` gates the app until the CLI is found and signed in ("Continue anyway" if status is unknown). Appearance: `theme.ts`, `Appearance.svelte`, applied as CSS variables on `<html>` from `+page.svelte`.
+- The installer and login flows are unit-tested and `auth_status` is verified against the real CLI, but the install + browser login flows have NOT been run end to end on a clean machine.
+- The app does not bundle the Claude CLI (redistribution/licensing); the wizard downloads Anthropic's official installer with the user's consent.
+
 ## 11. Next steps (in order)
 0. PRs #2 and #3 are merged (M2-M4 + UI polish). The owner confirmed Code and Chat work in `tauri dev`; presets, resume and Settings still deserve a manual click-through.
 1. **Merge PR #1** (CI green) and tag `v0.0.1-alpha`; record release-build size/RAM in PROGRESS.md.

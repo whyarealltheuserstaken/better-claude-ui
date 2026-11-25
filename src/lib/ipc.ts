@@ -1,4 +1,4 @@
-import type { AppConfig, Preset, ChatItem, CliStatus, FeatureInfo, SessionEventPayload, StartOptions } from "./types";
+import type { AppConfig, AuthStatus, Preset, ChatItem, CliStatus, FeatureInfo, SessionEventPayload, StartOptions } from "./types";
 
 export const inTauri = (): boolean => typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
@@ -9,6 +9,9 @@ async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T
 }
 
 export const ipc = {
+  authStatus: () => invoke<AuthStatus>("auth_status"),
+  installerPreview: () => invoke<string>("installer_preview"),
+  runSetupStep: (step: "install" | "login") => invoke<number | null>("run_setup_step", { step }),
   listPresets: () => invoke<Preset[]>("list_presets"),
   getConfig: () => invoke<AppConfig>("get_config"),
   setConfig: (config: AppConfig) => invoke<void>("set_config", { config }),
@@ -44,4 +47,10 @@ export async function pickFolder(): Promise<string | null> {
   const { open } = await import("@tauri-apps/plugin-dialog");
   const r = await open({ directory: true, multiple: false });
   return typeof r === "string" ? r : null;
+}
+
+export async function onSetupLog(handler: (line: string) => void): Promise<() => void> {
+  if (!inTauri()) return () => {};
+  const { listen } = await import("@tauri-apps/api/event");
+  return listen<string>("setup-log", (e) => handler(e.payload));
 }

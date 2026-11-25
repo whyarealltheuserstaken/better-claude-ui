@@ -38,6 +38,12 @@ Legend: [x] done · [~] in progress · [ ] todo
 - [ ] In-app preset editor (Intermediate+); for now users add JSON files to `<config>/presets/`
 
 ## Later
+## M5b — Setup wizard, themes, styles
+- [x] In-app setup wizard: detects missing CLI and signed-out state; runs the official installer and `claude auth login` on explicit click, streaming output
+- [x] 8 built-in themes + Match system; fully editable custom themes; import/export JSON
+- [x] 4 built-in styles (Modern, Terminal, Compact, Reading); editable (font, size, corners, spacing, width, message and tool style, prompt symbol)
+- [ ] Verify the installer + login steps end to end on a clean machine/VM (not run here: CLI already installed)
+
 ## M5 — Polish and release
 - [x] Visual polish pass (PR #3)
 - [x] Strict production CSP (ADR 0002); release build verified: NSIS 1.63 MB, MSI 2.35 MB, UI renders with zero CSP/console errors
