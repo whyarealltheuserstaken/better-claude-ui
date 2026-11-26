@@ -66,6 +66,17 @@ export async function onSessionEvent(handler: (p: SessionEventPayload) => void):
   return listen<SessionEventPayload>("session-event", (e) => handler(e.payload));
 }
 
+/** Make the standard title bar match the theme. Does nothing in a plain browser. */
+export async function setWindowTheme(scheme: "dark" | "light"): Promise<void> {
+  if (!inTauri()) return;
+  try {
+    const { getCurrentWindow } = await import("@tauri-apps/api/window");
+    await getCurrentWindow().setTheme(scheme);
+  } catch {
+    // Cosmetic only: an older system may not support it.
+  }
+}
+
 export async function openUrl(url: string): Promise<void> {
   if (!/^https:\/\//.test(url)) return;
   if (!inTauri()) {

@@ -167,4 +167,5 @@
   .ctx button { min-height: 30px; padding: 4px 14px; background: none; border: 0; border-radius: var(--radius-sm); }
   .ctx button:hover, .ctx button:focus-visible { background: var(--accent); color: var(--accent-ink); }
   @media (hover: none) { .x { opacity: 1; } }
+  @media (max-width: 860px) { aside { width: 196px; } }
 </style>
