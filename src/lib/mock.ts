@@ -72,6 +72,10 @@ export async function mockInvoke<T>(cmd: string, args?: Record<string, unknown>)
     }
     case "usage_limits":
       return { captured_at: Date.now() - 60000, status: "allowed", using_overage: false, windows: [{ name: "five_hour", utilization: 0.62, resets_at: Math.floor(Date.now() / 1000) + 5400, status: "allowed" }, { name: "seven_day", utilization: 0.31, resets_at: Math.floor(Date.now() / 1000) + 3 * 86400, status: "allowed" }] } as T;
+    case "refresh_limits": {
+      await wait(1200);
+      return { captured_at: Date.now(), status: "allowed", using_overage: false, windows: [{ name: "five_hour", utilization: 0.31, resets_at: Math.floor(Date.now() / 1000) + 5000, status: "allowed" }, { name: "seven_day", utilization: 0.31, resets_at: Math.floor(Date.now() / 1000) + 3 * 86400, status: "allowed" }] } as T;
+    }
     case "usage_clear":
       return undefined as T;
     case "read_config_file":

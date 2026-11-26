@@ -48,6 +48,7 @@ pub fn run() {
             commands::run_cli,
             commands::usage_summary,
             commands::usage_limits,
+            commands::refresh_limits,
             commands::usage_clear,
             commands::auth_status,
             commands::installer_preview,

@@ -1,6 +1,6 @@
 // End-to-end test of the REAL app against the REAL `claude` CLI, driven over WebView2's debug port.
 // Windows: starts `npm run tauri dev` itself. Usage: node tools/e2e.mjs
-// Scenarios: `node tools/e2e.mjs` (permission flow, default), `attach` (image + text attachments in Chat), `caps` (slash menu, capabilities panel, CLAUDE.md editor), `chat` (palette, web search in Chat, tool lockdown, export), `projects` (project instructions applied to a chat, conversation search), `data` (export, import of Claude.ai/ChatGPT/Markdown files, archive, continue in a new chat; runs in a THROWAWAY profile), `updater` (in-app updater against a local signed test server; never installs anything).
+// Scenarios: `node tools/e2e.mjs` (permission flow, default), `attach` (image + text attachments in Chat), `caps` (slash menu, capabilities panel, CLAUDE.md editor), `chat` (palette, web search in Chat, tool lockdown, export), `projects` (project instructions applied to a chat, conversation search), `limits` (stale allowance snapshot, reset window, live Refresh; THROWAWAY profile), `data` (export, import of Claude.ai/ChatGPT/Markdown files, archive, continue in a new chat; runs in a THROWAWAY profile), `updater` (in-app updater against a local signed test server; never installs anything).
 // Uses your claude login (a few cents of tokens). Exits non-zero on failure.
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, rmSync, readFileSync } from "node:fs";
@@ -16,6 +16,21 @@ const PORT = Number(process.env.E2E_PORT ?? 9477);
 const work = join(tmpdir(), "bcu-e2e-work");
 rmSync(work, { recursive: true, force: true });
 mkdirSync(work, { recursive: true });
+
+let limitsProfile = null;
+if (scenario === "limits") {
+  const { writeFileSync } = await import("node:fs");
+  limitsProfile = join(tmpdir(), `bcu-e2e-limits-${process.pid}`);
+  rmSync(limitsProfile, { recursive: true, force: true });
+  mkdirSync(limitsProfile, { recursive: true });
+  writeFileSync(join(limitsProfile, "config.json"), JSON.stringify({ onboarded: true, tier: "intermediate", auto_update_check: false }));
+  const nowSec = Math.floor(Date.now() / 1000);
+  // A deliberately stale snapshot (3 hours old): the 5-hour window has ALREADY RESET, the weekly one has not.
+  writeFileSync(join(limitsProfile, "limits.json"), JSON.stringify({ captured_at: Date.now() - 3 * 3600_000, status: "allowed", using_overage: false, windows: [
+    { name: "five_hour", utilization: 0.1, resets_at: nowSec - 600, status: "allowed" },
+    { name: "seven_day", utilization: 0.05, resets_at: nowSec + 3 * 86400, status: "allowed" } ] }));
+  process.env.BCU_CONFIG_DIR = limitsProfile; // debug-only override: the real profile is never touched
+}
 
 let dataProfile = null;
 let dataInbox = null;
@@ -106,6 +121,44 @@ try {
   await page.getByRole("heading", { name: "Home" }).waitFor();
   step("Home visible, CLI detected");
   await page.getByText(/Claude Code \d/).first().waitFor();
+
+  if (scenario === "limits") {
+    const fsx = await import("node:fs");
+    const expect = (cond, msg) => { if (!cond) throw new Error(msg); };
+    const widget = page.locator("section.widget").filter({ hasText: "Plan usage limits" });
+    await widget.waitFor();
+    let txt = (await widget.innerText()).replace(/\s+/g, " ");
+    step("stale snapshot shows: " + txt.slice(0, 200));
+    expect(/3 h ago/.test(txt) && /may be behind/.test(txt), "expected an 'updated 3 h ago, may be behind' note");
+    expect(/reset since the last update/.test(txt), "the already-reset 5-hour window must say it has reset, not show its old 10%");
+    expect(!/\b10%/.test(txt), "the old 10% must not be shown for a window that has reset");
+    expect(/5%/.test(txt), "the weekly window (not reset) still shows its saved value");
+    await widget.getByRole("button", { name: "Refresh now" }).click();
+    await page.waitForFunction(() => { const w = [...document.querySelectorAll("section.widget")].find((x) => x.textContent.includes("Plan usage limits")); return w && /Updated just now/.test(w.textContent); }, null, { timeout: 90000 });
+    txt = (await widget.innerText()).replace(/\s+/g, " ");
+    step("after Refresh: " + txt.slice(0, 220));
+    expect(!/reset since the last update/.test(txt) && !/may be behind/.test(txt), "fresh numbers must not carry the stale warnings");
+    const pcts = [...txt.matchAll(/(\d+)%/g)].map((m) => Number(m[1]));
+    expect(pcts.length >= 2, "expected live percentages for both windows, got " + pcts);
+    const snap = JSON.parse(fsx.readFileSync(join(limitsProfile, "limits.json"), "utf8"));
+    expect(Date.now() - snap.captured_at < 120_000, "limits.json should have been refreshed");
+    const ledger = fsx.readFileSync(join(limitsProfile, "usage.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
+    expect(ledger.some((r) => r.session === "limits-refresh" && r.cost_usd > 0 && r.cost_usd < 0.05), "the tiny cost should be recorded in the usage ledger");
+    step(`live five_hour/weekly from the real CLI: ${pcts.join("% / ")}%; refresh cost recorded: $${ledger.at(-1).cost_usd.toFixed(4)}`);
+    spawn("taskkill", ["/F", "/T", "/PID", String(app.pid)], { stdio: "ignore" });
+    spawn("taskkill", ["/F", "/IM", "better-claude-ui.exe"], { stdio: "ignore" });
+    for (let i = 0; i < 10; i++) {
+      await new Promise((r) => setTimeout(r, 1500));
+      try { rmSync(limitsProfile, { recursive: true, force: true }); break; } catch { /* still closing */ }
+    }
+    // The CLI also keeps a (empty) project folder for the scratch directory it ran in: remove ours.
+    const { homedir } = await import("node:os");
+    const cliDir = join(homedir(), ".claude", "projects", limitsProfile.replace(/[^A-Za-z0-9]/g, "-") + "-chat");
+    if (cliDir.includes("bcu-e2e-limits") && fsx.existsSync(cliDir)) rmSync(cliDir, { recursive: true, force: true });
+    console.log("E2E LIMITS PASSED");
+    cleanup(0);
+    await new Promise(() => {});
+  }
 
   if (scenario === "data") {
     const fsx = await import("node:fs");

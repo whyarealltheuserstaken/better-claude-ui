@@ -2,6 +2,11 @@
 
 Legend: [x] done · [~] in progress · [ ] todo
 
+## Plan allowance freshness (reported by the owner 2026-11-26: app showed 27%, Claude app 30%)
+- [x] Root cause found: the CLI reports the 5-hour/weekly allowance **once per reply, never on its own** (no command or initialize field exposes it), so the app's number is a snapshot that lags usage elsewhere. The CLI itself showed 30% at the same moment.
+- [x] Always show "Updated N min ago" with a plain explanation; warn "may be behind" after 10 min; a window that has **reset** since the snapshot says so instead of showing its old percentage
+- [x] Optional **Refresh** (Home widget and Usage page): one minimal request (haiku, no tools/MCP/commands, nothing saved, one turn), about 8 s and about $0.001 API-equivalent, recorded in the usage ledger. Verified in the real app (`node tools/e2e.mjs limits`, throwaway profile)
+
 ## Data export and import (requested 2026-11-26; ADR 0004, spec in `docs/EXPORT_FORMAT.md`)
 - [x] Export all my data: restorable `backup.json`, documented `universal.json`, one Markdown file per conversation, README with a privacy note; never overwrites a folder
 - [x] Import: Claude.ai ZIP, ChatGPT ZIP/JSON (tree flattened to the branch you saw), BetterClaudeUI backup or export folder, Markdown/text, best-effort for other JSON (Grok exporters etc., with a warning); preview before anything is saved; re-imports add nothing

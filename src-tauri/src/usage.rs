@@ -118,6 +118,52 @@ pub struct LimitsSnapshot {
     pub windows: Vec<RateWindow>,
 }
 
+/// Arguments for the smallest possible request that makes Claude Code report the plan allowance:
+/// no tools, no MCP servers, no slash commands, nothing saved to disk, one turn, the cheapest model.
+/// (Deliberately NOT `--bare`: that skips subscription sign-in.)
+pub fn refresh_args() -> Vec<String> {
+    [
+        "-p",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--model",
+        "haiku",
+        "--tools",
+        "",
+        "--strict-mcp-config",
+        "--disable-slash-commands",
+        "--no-session-persistence",
+        "--max-turns",
+        "1",
+        "Reply with the single word ok.",
+    ]
+    .map(String::from)
+    .to_vec()
+}
+
+/// The allowance windows from the CLI's output lines (the last report wins), if it reported any.
+pub fn snapshot_from_lines(lines: &[String], now_ms: u64) -> Option<LimitsSnapshot> {
+    lines
+        .iter()
+        .filter_map(|l| crate::cli::events::parse_line(l).ok())
+        .flatten()
+        .filter_map(|e| match e {
+            crate::cli::events::Event::RateLimit {
+                status,
+                windows,
+                using_overage,
+            } if !windows.is_empty() => Some(LimitsSnapshot {
+                captured_at: now_ms,
+                status,
+                using_overage,
+                windows,
+            }),
+            _ => None,
+        })
+        .next_back()
+}
+
 pub fn save_limits(dir: &Path, snap: &LimitsSnapshot) -> std::io::Result<()> {
     std::fs::create_dir_all(dir)?;
     std::fs::write(
@@ -396,6 +442,62 @@ mod tests {
         save_limits(&d, &snap).unwrap();
         assert_eq!(load_limits(&d), Some(snap));
         let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn refresh_request_is_minimal_and_never_uses_bare() {
+        let a = refresh_args();
+        let at = |f: &str| {
+            a.iter()
+                .position(|x| x == f)
+                .unwrap_or_else(|| panic!("missing {f}"))
+        };
+        assert_eq!(a[at("--tools") + 1], "", "no tools");
+        assert_eq!(a[at("--max-turns") + 1], "1");
+        assert_eq!(a[at("--model") + 1], "haiku");
+        for f in [
+            "--strict-mcp-config",
+            "--disable-slash-commands",
+            "--no-session-persistence",
+            "--verbose",
+        ] {
+            assert!(a.contains(&f.to_string()), "{f}");
+        }
+        assert!(
+            !a.contains(&"--bare".to_string()),
+            "--bare skips subscription sign-in"
+        );
+    }
+
+    #[test]
+    fn snapshot_comes_from_the_last_rate_limit_report_and_ignores_noise() {
+        let report = |five: f64| {
+            format!(
+                r#"{{"type":"rate_limit_event","rate_limit_info":{{"status":"allowed","isUsingOverage":false,"unifiedWindows":{{"five_hour":{{"utilization":{five},"resetsAt":1795635600,"status":"allowed"}}}}}}}}"#
+            )
+        };
+        let lines = vec![
+            "not json".to_string(),
+            report(0.27),
+            r#"{"type":"assistant"}"#.to_string(),
+            report(0.31),
+        ];
+        let snap = snapshot_from_lines(&lines, 123).unwrap();
+        assert_eq!(snap.captured_at, 123);
+        assert!(
+            (snap.windows[0].utilization - 0.31).abs() < 1e-9,
+            "the latest report wins"
+        );
+        assert!(
+            snapshot_from_lines(
+                &["garbage".to_string(), r#"{"type":"result"}"#.to_string()],
+                1
+            )
+            .is_none()
+        );
+        assert!(snapshot_from_lines(&[], 1).is_none());
+        // a report with no windows is not a usable snapshot
+        assert!(snapshot_from_lines(&[r#"{"type":"rate_limit_event"}"#.to_string()], 1).is_none());
     }
 
     #[test]

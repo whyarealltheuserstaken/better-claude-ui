@@ -211,6 +211,9 @@
             onteams={() => (app.showPresets = true)}
             onresume={(r) => app.resume(r)}
             onusage={() => app.go("usage")}
+            refreshing={app.limitsRefreshing}
+            refreshError={app.limitsError}
+            onrefreshlimits={() => app.refreshLimits()}
             projects={app.projects}
             onproject={(id, mode) => { app.setMode(mode); void app.newSession({ projectId: id }); }}
             onprojects={() => (app.showProjects = true)}
@@ -239,6 +242,9 @@
             onrange={(d) => app.refreshUsage(d)}
             onsave={(patch) => app.updateConfig(patch)}
             onclear={async () => { await ipc.usageClear(); await app.refreshUsage(); }}
+            refreshing={app.limitsRefreshing}
+            refreshError={app.limitsError}
+            onrefreshlimits={() => app.refreshLimits()}
             onopen={(u) => void openUrl(u)}
           />
         </div>

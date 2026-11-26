@@ -2,6 +2,7 @@
 
 ## Unreleased
 - **In-app updater**: signed updates only (tampered, wrongly signed and replayed installers are rejected), quiet daily check, manual check, release notes, progress, skip a version, never installs without a click or mid-reply. Verified against a local signed test server and with a real install-and-relaunch on Windows (0.1.0 to 0.1.1).
+- **Plan allowance freshness**: the usage meters say when they were last updated and why they can lag (Claude Code only reports them with each reply), a window that has reset no longer shows its old percentage, and a Refresh button fetches the live numbers with one tiny request (about a tenth of a cent).
 - **Export and import**: one-click export (restorable backup, documented universal JSON, Markdown per conversation), import from Claude.ai and ChatGPT exports, BetterClaudeUI backups and Markdown/text (best-effort for other JSON), preview before saving, a read-only Archive with "Continue in a new chat", and a safe restore that never re-enables risky settings. Tested against fixtures, not real exports.
 - Still planned before 0.1.0 ships: a few owner-chosen features (see `docs/GOALS.md`).
 
