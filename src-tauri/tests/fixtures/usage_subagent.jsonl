@@ -1,0 +1,8 @@
+// Cut down from a real capture (claude 2.1.332, 2026-11-26, haiku, one subagent): only token fields are kept. The subagent streamed no usage.
+{"type":"stream_event","event":{"type":"message_start","message":{"usage":{"input_tokens":2,"output_tokens":4,"cache_read_input_tokens":15027,"cache_creation_input_tokens":7567}}},"parent_tool_use_id":null}
+{"type":"stream_event","event":{"type":"message_delta","usage":{"input_tokens":2,"output_tokens":291,"cache_read_input_tokens":15027,"cache_creation_input_tokens":7567}},"parent_tool_use_id":null}
+{"type":"stream_event","event":{"type":"message_stop"},"parent_tool_use_id":null}
+{"type":"stream_event","event":{"type":"message_start","message":{"usage":{"input_tokens":2,"output_tokens":8,"cache_read_input_tokens":22594,"cache_creation_input_tokens":559}}},"parent_tool_use_id":null}
+{"type":"stream_event","event":{"type":"message_delta","usage":{"input_tokens":2,"output_tokens":44,"cache_read_input_tokens":22594,"cache_creation_input_tokens":559}},"parent_tool_use_id":null}
+{"type":"stream_event","event":{"type":"message_stop"},"parent_tool_use_id":null}
+{"type":"result","is_error":false,"result":"banana","session_id":"00000000-0000-0000-0000-000000000000","total_cost_usd":0.0043092600000000005,"usage":{"input_tokens":4,"output_tokens":335,"cache_read_input_tokens":37621,"cache_creation_input_tokens":8126},"modelUsage":{"claude-haiku-5-5":{"inputTokens":6,"outputTokens":339,"cacheReadInputTokens":37621,"cacheCreationInputTokens":25228,"webSearchRequests":0,"costUSD":0.0043092600000000005}}}

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { addUserMessage, initialState, reduce, removePending } from "./reducer";
+import { addUserMessage, initialState, reduce, removePending, replyTokens } from "./reducer";
 import type { CliEvent, SessionEvent, SessionState } from "./types";
 
 const cli = (event: CliEvent): SessionEvent => ({ type: "cli", event });
@@ -127,5 +127,60 @@ describe("initialized", () => {
     expect(s.info?.commands[0].name).toBe("review");
     expect(s.info?.models[0].value).toBe("opus");
     expect(s.items).toHaveLength(0);
+  });
+});
+
+describe("token counting", () => {
+  type Counts = [input: number, output: number, cacheRead: number, cacheWrite: number];
+  const step = (start: boolean, [input, output, cache_read, cache_write]: Counts, parent: string | null = null) =>
+    cli({ kind: "step_usage", start, input, output, cache_read, cache_write, parent_tool_use_id: parent });
+  const split = ([input, output, cache_read, cache_write]: Counts) => ({ input, output, cache_read, cache_write });
+  const result = (...models: Counts[]) =>
+    cli({ kind: "turn_result", is_error: false, result: "", cost_usd: null, session_id: "x", models: models.map((m, i) => ({ model: `m${i}`, ...split(m), web_searches: 0, cost_usd: 0 })) });
+  // The recorded run (src-tauri/tests/fixtures/usage_subagent.jsonl).
+  const recorded = [step(true, [2, 4, 15027, 7567]), step(false, [2, 291, 15027, 7567]), step(true, [2, 8, 22594, 559]), step(false, [2, 44, 22594, 559])];
+
+  test("nothing is shown before the first report", () => {
+    expect(replyTokens(initialState())).toBeNull();
+  });
+
+  test("a step's later report replaces its counts instead of adding to them", () => {
+    expect(replyTokens(run(recorded.slice(0, 2)))).toEqual(split([2, 291, 15027, 7567]));
+  });
+
+  test("two steps add up", () => {
+    expect(replyTokens(run(recorded))).toEqual(split([4, 335, 37621, 8126]));
+  });
+
+  test("a later report with a missing field does not erase what is known", () => {
+    expect(replyTokens(run([step(true, [2, 4, 100, 50]), step(false, [0, 9, 0, 0])]))).toEqual(split([2, 9, 100, 50]));
+  });
+
+  test("interleaved helper and main steps are both counted", () => {
+    const s = run([step(true, [1, 1, 0, 0]), step(true, [10, 1, 0, 0], "t1"), step(false, [1, 5, 0, 0]), step(false, [10, 7, 0, 0], "t1"), step(true, [20, 2, 0, 0], "t1")]);
+    expect(replyTokens(s)).toEqual(split([31, 14, 0, 0]));
+  });
+
+  test("a finished reply uses the result totals, which include helpers that streamed nothing", () => {
+    const s = run([...recorded, result([6, 339, 37621, 25228])]);
+    expect(replyTokens(s)).toEqual(split([6, 339, 37621, 25228]));
+  });
+
+  test("result totals are cumulative: the next reply counts only what is new, across models", () => {
+    let s = run([...recorded, result([6, 339, 37621, 25228])]);
+    s = addUserMessage(s, "again");
+    expect(replyTokens(s)).toBeNull();
+    s = run([result([8, 400, 40000, 25300], [1, 2, 3, 4])], s);
+    expect(replyTokens(s)).toEqual(split([3, 63, 2382, 76]));
+  });
+
+  test("a result without model totals keeps the live count", () => {
+    expect(replyTokens(run([...recorded, result()]))).toEqual(split([4, 335, 37621, 8126]));
+  });
+
+  test("totals that go backwards never produce a negative or broken count", () => {
+    let s = run([result([100, 100, 100, 100])]);
+    s = run([result([5, 5, 5, 5])], addUserMessage(s, "after a restart"));
+    expect(replyTokens(s)).toEqual(split([5, 5, 5, 5]));
   });
 });

@@ -36,3 +36,10 @@ Errors: an invalid `--model` yields a normal stream whose `result` has `is_error
 ## Gotchas
 - A user's own hooks (e.g. PreToolUse gates) run inside the session and can reject tool calls; surface hook output rather than hiding it. Consider `--setting-sources` to let users opt out of project/user settings.
 - Parallel subagent output is distinguishable by `parent_tool_use_id` on `stream_event`/`assistant`/`user` lines (to be confirmed in M4).
+
+## Token usage while a reply streams (captured 2026-11-26, `claude` 2.1.332, fixture `usage_subagent.jsonl`)
+- `stream_event` `message_start` carries `event.message.usage`; `message_delta` carries `event.usage`. Fields: `input_tokens`, `output_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens`.
+- Within one step the delta **repeats** the input and cache counts and gives the output as a **running total** (4 became 291). Replace (take the larger), never add.
+- The two steps of the main agent add up exactly to `result.usage`.
+- A subagent streamed **no** usage. Its tokens are not in `result.usage`; they are only in `result.modelUsage`, which is cumulative for the process. (One subagent with one step was captured; a longer one has not been.)
+- So the app shows the main agent live and, when the reply finishes, the growth in `modelUsage` since the previous reply, which matches the usage ledger.

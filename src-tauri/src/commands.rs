@@ -469,6 +469,16 @@ pub async fn usage_summary(offset_minutes: i32, days: u32) -> Result<Summary, St
     .map_err(|e| e.to_string())
 }
 
+/// Totals for one conversation, by the CLI's session id.
+#[tauri::command]
+pub async fn usage_session(session_id: String) -> Result<usage::Totals, String> {
+    tokio::task::spawn_blocking(move || {
+        usage::session_totals(&usage::load(&platform::config_dir()), &session_id)
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub fn usage_limits() -> Option<LimitsSnapshot> {
     usage::load_limits(&platform::config_dir())

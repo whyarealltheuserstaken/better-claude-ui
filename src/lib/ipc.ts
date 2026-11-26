@@ -1,7 +1,7 @@
 import type { ArchiveDoc, ArchiveEntry } from "./archive";
 import type { ExportResult, ImportOptions, ImportResult, Inspection } from "./exchange";
 import type { UpdateInfo } from "./updates";
-import type { AppConfig, AuthStatus, CliOutput, LimitsSnapshot, UsageSummary, Preset, ChatItem, CliStatus, FeatureInfo, SessionEventPayload, StartOptions } from "./types";
+import type { AppConfig, AuthStatus, CliOutput, LimitsSnapshot, Totals, UsageSummary, Preset, ChatItem, CliStatus, FeatureInfo, SessionEventPayload, StartOptions } from "./types";
 
 export const inTauri = (): boolean => typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
@@ -16,6 +16,7 @@ export const ipc = {
   installerPreview: () => invoke<string>("installer_preview"),
   runSetupStep: (step: "install" | "login") => invoke<number | null>("run_setup_step", { step }),
   usageSummary: (days: number) => invoke<UsageSummary>("usage_summary", { offsetMinutes: -new Date().getTimezoneOffset(), days }),
+  usageSession: (sessionId: string) => invoke<Totals>("usage_session", { sessionId }),
   usageLimits: () => invoke<LimitsSnapshot | null>("usage_limits"),
   refreshLimits: () => invoke<LimitsSnapshot>("refresh_limits"),
   usageClear: () => invoke<void>("usage_clear"),

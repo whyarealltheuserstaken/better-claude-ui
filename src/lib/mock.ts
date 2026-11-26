@@ -13,6 +13,7 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 async function playTurn(id: string, text: string) {
   await wait(250);
   const reply = `Sure. Here's a quick plan for **${text.slice(0, 40)}**:\n\n1. Look at the project\n2. Make the change\n3. Run the tests\n\n\`\`\`ts\nexport const answer: number = 42;\n\`\`\`\n`;
+  cli(id, { kind: "step_usage", start: true, input: 4, output: 1, cache_read: 15000, cache_write: 900, parent_tool_use_id: null });
   for (const ch of reply.match(/.{1,6}/gs) ?? []) {
     cli(id, { kind: "text_delta", text: ch, parent_tool_use_id: null });
     await wait(15);
@@ -70,6 +71,8 @@ export async function mockInvoke<T>(cmd: string, args?: Record<string, unknown>)
         daily, days,
       } as T;
     }
+    case "usage_session":
+      return { cost_usd: 0.42, input: 1200, output: 5400, cache_read: 88000, cache_write: 6100, turns: 6 } as T;
     case "usage_limits":
       return { captured_at: Date.now() - 60000, status: "allowed", using_overage: false, windows: [{ name: "five_hour", utilization: 0.62, resets_at: Math.floor(Date.now() / 1000) + 5400, status: "allowed" }, { name: "seven_day", utilization: 0.31, resets_at: Math.floor(Date.now() / 1000) + 3 * 86400, status: "allowed" }] } as T;
     case "refresh_limits": {

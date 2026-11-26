@@ -21,6 +21,11 @@ const scenarios = {
     prompt: "Create a file named hello.txt in the current directory containing the word hi. Use the Write tool.",
   },
   error_model: { args: ["--model", "definitely-not-a-model"], prompt: "hello" },
+  // Token counts with one helper agent. Cheapest model; the user's own settings, plugins and servers are left out.
+  usage_subagent: {
+    args: ["--model", "haiku", "--setting-sources", "project", "--strict-mcp-config"],
+    prompt: "Start exactly one subagent with the Task tool and have it reply with the single word banana. Then tell me the word it replied with.",
+  },
 };
 const sc = scenarios[scenario];
 if (!sc) throw new Error("unknown scenario");
