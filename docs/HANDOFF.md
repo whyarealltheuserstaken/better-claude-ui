@@ -72,7 +72,7 @@ What the owner asked for, in their own terms:
 
 **Measured (Windows release build, 2026-11-25):** NSIS installer 2.58 MB, MSI 3.57 MB (the updater added about 0.85 MB; earlier figures 1.74/2.51 MB were before it); Home visible in about 0.9 s from launch (including test attach); idle memory about 157 MB private across 7 processes (the app exe itself is 6 MB; the rest is WebView2), rising to about 255 MB after a real chat with a preview open. The original "under 100 MB" target is not achievable with WebView2; treat about 160 MB idle as the realistic figure (still far below Electron).
 
-**Tests:** Rust 100+ unit and 8 integration (134 lib tests), clippy `-D warnings` and fmt clean; UI 148 Vitest tests, `npm run check` 0 errors; 10 real-app E2E scenarios (`basic`, `attach`, `caps`, `chat`, `projects`, `preview`, `updater`, `data`, `limits`, `probe`).
+**Tests:** Rust 100+ unit and 8 integration (134 lib tests), clippy `-D warnings` and fmt clean; UI 148 Vitest tests, `npm run check` 0 errors; 11 real-app E2E scenarios (`basic`, `attach`, `caps`, `chat`, `projects`, `preview`, `updater`, `data`, `limits`, `autorefresh`, `probe`).
 
 ## 4. How to build, run, test
 
@@ -192,6 +192,9 @@ The parser, broker and registry were written test-first with a RED run observed.
 - The allowance (`rate_limit_event.unifiedWindows`) arrives **once per reply and not otherwise**. Nothing in `claude --help`, `claude auth status` or the `initialize` reply exposes it, so there is no free way to poll it. Do not add background polling: every refresh spends a little of the user's allowance.
 - `refresh_limits` (commands.rs, `usage::refresh_args`) runs the smallest possible request: `-p --model haiku --tools "" --strict-mcp-config --disable-slash-commands --no-session-persistence --max-turns 1`. **Never add `--bare`**: it skips OAuth/keychain, which breaks subscription sign-in. It records its tiny cost in the ledger (session id `limits-refresh`).
 - UI logic is in `src/lib/limits.ts` (as-of label, reset detection, "may be behind"). `node tools/e2e.mjs limits` seeds a stale snapshot with an already-reset window in a throwaway profile and checks the live refresh.
+
+- **Automatic refresh** (`auto_refresh_limits`, `refresh_limits_minutes` in config, default off/15): scheduling rules are pure in `limits.ts` (`shouldAutoRefresh`), the timer is `autoRefreshTick` in the store (first check ~20 s after launch, then every 60 s, runs only when due). `refresh_args` now includes `--setting-sources project` (measured: no plugin hooks, ~2 s, ~5x cheaper, sign-in unaffected). `node tools/e2e.mjs autorefresh` proves it with nothing clicked.
+- **Scope of the meters:** the 5-hour/weekly percentages are the account's plan-wide windows as reported by Claude Code (they matched the Claude app to the percent), so they reflect usage elsewhere too. The cost/token tables (Today, month, by model, by project) only count what ran through THIS app. Do not claim either covers a specific other product (for example Cowork) without verifying.
 
 ## 10k. Data export / import / Archive (session 3)
 - Code: `src-tauri/src/exchange/` (`model` shared types and helpers, `parse` importers, `archive` store, `export`, `import`), commands `export_data`, `inspect_import`, `run_import`, `archive_*` in `commands.rs`; UI `ImportPanel.svelte`, `ArchivePage.svelte`, Settings "Your data", sidebar "Archive"; helpers `exchange.ts`, `archive.ts`. Spec: `docs/EXPORT_FORMAT.md`; decisions and security: ADR 0004.

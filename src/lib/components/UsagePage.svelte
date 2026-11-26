@@ -2,6 +2,7 @@
   import { LIMITS_NOTE, asOfLabel, mayBeBehind, windowHasReset } from "../limits";
   import { budgetState, fmtReset, fmtTokens, fmtUsd, modelLabel, pct, toCsv, windowLabel } from "../format";
   import DailyChart from "../widgets/DailyChart.svelte";
+  import AutoRefresh from "./AutoRefresh.svelte";
   import Meter from "../widgets/Meter.svelte";
   import type { AppConfig, AuthStatus, LimitsSnapshot, Totals, UsageSummary } from "../types";
 
@@ -18,6 +19,8 @@
     refreshing = false,
     refreshError = null,
     onrefreshlimits = () => {},
+    onautorefresh = () => {},
+    limitsPaused = false,
   }: {
     config: AppConfig;
     usage: UsageSummary | null;
@@ -31,6 +34,8 @@
     refreshing?: boolean;
     refreshError?: string | null;
     onrefreshlimits?: () => void;
+    onautorefresh?: (patch: { auto_refresh_limits?: boolean; refresh_limits_minutes?: number }) => void;
+    limitsPaused?: boolean;
   } = $props();
 
   const now = $derived(Date.now());
@@ -109,6 +114,7 @@
       {#if limits.using_overage}<p class="warn">You are using extra usage beyond your plan.</p>{/if}
       <p class="sub" class:warn={mayBeBehind(limits.captured_at, now)}>Updated {asOfLabel(limits.captured_at, now)}{mayBeBehind(limits.captured_at, now) ? ", may be behind" : ""}. {LIMITS_NOTE}</p>
     {/if}
+    <AutoRefresh enabled={config.auto_refresh_limits} minutes={config.refresh_limits_minutes} paused={limitsPaused} onchange={onautorefresh} />
     <div class="links">
       <button disabled={refreshing} onclick={onrefreshlimits} title="Sends one tiny request (about a tenth of a cent in API terms) so Claude Code reports your current allowance. It counts a hair toward your allowance.">{refreshing ? "Refreshing…" : "Refresh allowance"}</button>
       <button onclick={() => onopen("https://claude.ai/settings/usage")}>Open plan usage on claude.ai</button>

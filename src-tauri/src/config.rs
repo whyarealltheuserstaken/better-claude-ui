@@ -37,6 +37,10 @@ pub struct AppConfig {
     pub last_update_check: Option<u64>,
     /// A version the user chose to skip; automatic checks stay quiet about it.
     pub skipped_version: Option<String>,
+    /// Refresh the plan-allowance meters on a timer (opt-in; each refresh is one tiny request).
+    pub auto_refresh_limits: bool,
+    /// Minutes between automatic refreshes (5 to 180).
+    pub refresh_limits_minutes: u32,
 }
 
 impl Default for AppConfig {
@@ -73,6 +77,8 @@ impl Default for AppConfig {
             auto_update_check: true,
             last_update_check: None,
             skipped_version: None,
+            auto_refresh_limits: false,
+            refresh_limits_minutes: 15,
         }
     }
 }
