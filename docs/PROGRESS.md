@@ -24,7 +24,8 @@ Legend: [x] done · [~] in progress · [ ] todo
 ## UI and UX revamp (plan: `docs/superpowers/plans/2026-11-26-ui-revamp.md`)
 - [x] Stage 1: design system (readable colours derived from every theme, Solarized contrast fixed, Lucide icons, shared menu, switch and meter)
 - [x] Stage 2: shell (sidebar holds all navigation, new toolbar with search bar, glass panels over a glow that turns amber while Claude waits, title bar follows the theme, Ctrl+B)
-- [ ] Stages 3 to 7: conversation and right panel, Home and Usage, Settings and pages, usage widget, tray
+- [x] Stage 3: conversation and right panel (session controls and activity in the panel, in the composer when it is closed; permission prompt order Deny, Always allow, Allow with nothing preselected)
+- [ ] Stages 4 to 7: Home and Usage, Settings and pages, usage widget, tray
 - Note: the E2E scenarios still use the old layout until stage 5
 
 ## v0.1.0 release gate (owner decision, details in `docs/GOALS.md`)

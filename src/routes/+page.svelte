@@ -11,7 +11,7 @@
   import { pickFolder, pickImportFile, setWindowTheme } from "$lib/ipc";
   import Backdrop from "$lib/components/Backdrop.svelte";
   import Toolbar from "$lib/components/Toolbar.svelte";
-  import { waitingModes } from "$lib/shell";
+  import { PANEL_DOCK_MIN_WIDTH, panelState, waitingModes } from "$lib/shell";
   import Palette from "$lib/components/Palette.svelte";
   import { allStyles, allThemes } from "$lib/theme";
   import type { PaletteItem } from "$lib/palette";
@@ -22,7 +22,9 @@
   import PresetPicker from "$lib/components/PresetPicker.svelte";
   import Onboarding from "$lib/components/Onboarding.svelte";
   import RawLog from "$lib/components/RawLog.svelte";
-  import SessionBar from "$lib/components/SessionBar.svelte";
+  import SessionControls from "$lib/components/SessionControls.svelte";
+  import RightPanel from "$lib/components/RightPanel.svelte";
+  import { findProject } from "$lib/projects";
   import Settings from "$lib/components/Settings.svelte";
   import Composer from "$lib/components/Composer.svelte";
   import MessageList from "$lib/components/MessageList.svelte";
@@ -118,6 +120,21 @@
   const waiting = $derived(waitingModes(app.metas, app.states));
   const waitingHere = $derived(app.view === "session" && (app.active?.pending.length ?? 0) > 0);
 
+  let width = $state(1100);
+  let overlayOpen = $state(false);
+  const panel = $derived(app.active && app.activeMeta ? panelState(width, app.config.panel_hidden, app.view, overlayOpen) : "closed");
+  const hasPanel = $derived(app.view === "session" && !!app.active && !!app.activeMeta);
+  function togglePanel() {
+    if (width >= PANEL_DOCK_MIN_WIDTH) void app.updateConfig({ panel_hidden: !app.config.panel_hidden });
+    else overlayOpen = !overlayOpen;
+  }
+  const waitingIds = $derived(new Set((app.active?.pending ?? []).map((p) => p.tool_use_id)));
+  let transcript: ReturnType<typeof MessageList> | undefined = $state();
+  function jump(id: string) {
+    overlayOpen = false;
+    void transcript?.jumpTo(id);
+  }
+
   const heading = $derived.by((): { title: string; subtitle: string } => {
     if (app.view === "home") return { title: "Home", subtitle: "Your usage and shortcuts" };
     if (app.view === "usage") return { title: "Usage", subtitle: "Tokens and estimated cost on this computer" };
@@ -151,7 +168,7 @@
 </script>
 
 <svelte:head><title>BetterClaudeUI</title></svelte:head>
-<svelte:window onkeydown={onGlobalKey} />
+<svelte:window onkeydown={(e) => { if (e.key === "Escape") overlayOpen = false; onGlobalKey(e); }} bind:innerWidth={width} />
 
 {#if !app.cliChecked}
   <main class="center"><p class="muted">Looking for Claude…</p></main>
@@ -199,6 +216,7 @@
         onsearch={() => (app.showPalette = true)}
         onexport={app.view === "session" && active && active.items.length > 0 ? () => app.exportActive() : undefined}
         onterminal={app.view === "session" && active && active.items.length > 0 ? () => app.openTerminal() : undefined}
+        onpanel={hasPanel ? togglePanel : undefined}
       >
         {#if shouldShowChip(app.update, app.config.skipped_version)}
           <button class="pill accent" onclick={() => (app.showUpdate = true)} title="A new version of BetterClaudeUI is available">
@@ -208,8 +226,6 @@
         {#if todayBudget.level !== "none"}
           <button class="pill" data-level={todayBudget.level} onclick={() => app.go("usage")} title="Today's estimated cost against your daily budget">Today {fmtUsd(app.usage?.today.cost_usd ?? 0)}</button>
         {/if}
-        {#if app.view === "session" && active && active.costUsd > 0}<span class="meta" title="Estimated cost of this session (API prices)">{fmtUsd(active.costUsd)}</span>{/if}
-        {#if app.view === "session" && app.activeMeta?.preset}<span class="meta">Team: {app.activeMeta.preset}</span>{/if}
       </Toolbar>
       {#if app.error}
         <div class="banner" role="alert">
@@ -283,29 +299,18 @@
             {/each}
           </div>
         {:else}
-          <MessageList items={active.items} diffs={app.caps.diffs} oncopy={(t) => app.copyText(t)} onpreview={(code, lang) => (app.preview = { code, lang })} />
+          <MessageList bind:this={transcript} items={active.items} {waitingIds} diffs={app.caps.diffs} oncopy={(t) => app.copyText(t)} onpreview={(code, lang) => (app.preview = { code, lang })} />
         {/if}
         <div class="dock">
           <div class="column">
             {#each active.pending as p (p.request_id)}
               <PermissionPrompt request={p} onresolve={(id, d) => app.resolve(id, d)} />
             {/each}
-            {#if app.activeMeta}
-              <SessionBar
-                caps={app.caps}
-                model={app.activeMeta.model}
-                permissionMode={app.activeMeta.permissionMode}
-                chat={app.activeMeta.mode === "chat"}
-                models={active.info?.models ?? []}
-                effort={app.activeMeta.effort}
-                webSearch={app.activeMeta.webSearch}
-                oneffort={(e) => app.reconfigure(app.activeMeta!.id, { effort: e })}
-                onweb={(on) => app.reconfigure(app.activeMeta!.id, { webSearch: on })}
-                onmodel={(m) => app.reconfigure(app.activeMeta!.id, { model: m })}
-                onmode={(m) => app.reconfigure(app.activeMeta!.id, { permissionMode: m })}
-              />
-            {/if}
-            <Composer status={active.status} {glyph} commands={active.info ? active.info.commands.map((c) => c.name) : (active.caps?.slash_commands ?? [])} descriptions={Object.fromEntries((active.info?.commands ?? []).map((c) => [c.name, c.description]))} onsend={(t, a) => app.send(t, a)} oninterrupt={() => app.interrupt()} />
+            <Composer status={active.status} {glyph} commands={active.info ? active.info.commands.map((c) => c.name) : (active.caps?.slash_commands ?? [])} descriptions={Object.fromEntries((active.info?.commands ?? []).map((c) => [c.name, c.description]))} onsend={(t, a) => app.send(t, a)} oninterrupt={() => app.interrupt()}>
+              {#snippet controls()}
+                {#if panel === "closed"}{@render sessionControls("composer")}{/if}
+              {/snippet}
+            </Composer>
             {#if app.caps.rawLog}<RawLog events={active.raw} />{/if}
           </div>
         </div>
@@ -323,8 +328,33 @@
         </div>
       {/if}
     </section>
+    {#if panel !== "closed" && app.active && app.activeMeta}
+      {#if panel === "overlay"}<button class="scrim" aria-label="Dismiss the right panel" onclick={() => (overlayOpen = false)}></button>{/if}
+      <RightPanel meta={app.activeMeta} session={app.active} projectName={findProject(app.config.projects, app.activeMeta.project)?.name ?? null} overlay={panel === "overlay"} onjump={jump} onclose={() => (overlayOpen = false)}>
+        {#snippet controls()}{@render sessionControls("panel")}{/snippet}
+      </RightPanel>
+    {/if}
   </div>
 {/if}
+
+{#snippet sessionControls(variant: "panel" | "composer")}
+  {#if app.activeMeta}
+    <SessionControls
+      {variant}
+      caps={app.caps}
+      model={app.activeMeta.model}
+      permissionMode={app.activeMeta.permissionMode}
+      chat={app.activeMeta.mode === "chat"}
+      models={app.active?.info?.models ?? []}
+      effort={app.activeMeta.effort}
+      webSearch={app.activeMeta.webSearch}
+      oneffort={(e) => app.reconfigure(app.activeMeta!.id, { effort: e })}
+      onweb={(on) => app.reconfigure(app.activeMeta!.id, { webSearch: on })}
+      onmodel={(m) => app.reconfigure(app.activeMeta!.id, { model: m })}
+      onmode={(m) => app.reconfigure(app.activeMeta!.id, { permissionMode: m })}
+    />
+  {/if}
+{/snippet}
 
 {#if app.showPalette}
   <Palette items={paletteItems} search={searchConversations} onclose={() => (app.showPalette = false)} />
@@ -409,10 +439,12 @@
     border-radius: var(--float-radius);
     overflow: hidden;
   }
-  .meta {
-    color: var(--muted);
-    font-size: 12.5px;
-    white-space: nowrap;
+  .scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 24;
+    border: 0;
+    background: rgb(0 0 0 / 0.35);
   }
   .toast {
     position: fixed;

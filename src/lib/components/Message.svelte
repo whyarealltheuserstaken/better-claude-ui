@@ -8,9 +8,10 @@
   let {
     item,
     diffs = false,
+    waiting = false,
     oncopy,
     onpreview,
-  }: { item: ChatItem; diffs?: boolean; oncopy?: (text: string) => void; onpreview?: (code: string, lang: string) => void } = $props();
+  }: { item: ChatItem; diffs?: boolean; waiting?: boolean; oncopy?: (text: string) => void; onpreview?: (code: string, lang: string) => void } = $props();
 
   // Code block buttons (rendered inside the markdown HTML) are handled by delegation.
   function onblock(e: MouseEvent) {
@@ -39,7 +40,7 @@
     {#if oncopy && !item.streaming}<div class="foot"><button class="copy" aria-label="Copy reply" onclick={() => oncopy(itemText(item))}>Copy</button></div>{/if}
   </div>
 {:else if item.kind === "tool"}
-  <ToolCard {item} {diffs} />
+  <ToolCard {item} {diffs} {waiting} />
 {:else}
   <div class="notice" data-level={item.level} role={item.level === "error" ? "alert" : "status"}>{item.text}</div>
 {/if}
@@ -49,9 +50,12 @@
     margin: 26px 0 10px;
     padding: 10px 14px;
     background: var(--raised);
-    border-radius: var(--radius-lg);
-    font-weight: 560;
-    max-width: 88%;
+    border: 1px solid var(--line);
+    border-radius: var(--float-radius);
+    /* The messages you send sit on the trailing side. */
+    width: fit-content;
+    max-width: 82%;
+    margin-inline-start: auto;
   }
   .user p {
     margin: 0;
@@ -96,17 +100,21 @@
   :global(:root[data-user="bar"]) .user {
     background: none;
     border-radius: 0;
-    border-left: 3px solid var(--accent);
+    border: 0;
+    border-inline-start: 3px solid var(--accent);
     padding: 2px 0 2px 14px;
+    width: auto;
     max-width: none;
   }
   :global(:root[data-user="prompt"]) .user {
     background: none;
     border-radius: 0;
+    border: 0;
     padding: 0;
+    width: auto;
     max-width: none;
     font-weight: 600;
-    color: var(--accent);
+    color: var(--accent-text);
   }
   :global(:root[data-user="prompt"]) .user p::before {
     content: "❯ ";

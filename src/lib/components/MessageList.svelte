@@ -7,9 +7,10 @@
     items,
     pageSize = 150,
     diffs = false,
+    waitingIds = new Set<string>(),
     oncopy,
     onpreview,
-  }: { items: ChatItem[]; pageSize?: number; diffs?: boolean; oncopy?: (text: string) => void; onpreview?: (code: string, lang: string) => void } = $props();
+  }: { items: ChatItem[]; pageSize?: number; diffs?: boolean; waitingIds?: Set<string>; oncopy?: (text: string) => void; onpreview?: (code: string, lang: string) => void } = $props();
 
   // Long sessions render only the most recent window; older items load on demand.
   let extra = $state(0);
@@ -18,6 +19,16 @@
 
   let scroller: HTMLDivElement | undefined = $state();
   let stick = true;
+
+  /** Show the item (loading older messages if needed) and scroll to it. */
+  export async function jumpTo(id: string) {
+    const index = items.findIndex((i) => i.id === id);
+    if (index < 0) return;
+    if (index < start) extra = items.length - pageSize - index;
+    stick = false;
+    await tick();
+    [...(scroller?.querySelectorAll<HTMLElement>("[data-item]") ?? [])].find((el) => el.dataset.item === id)?.scrollIntoView({ block: "center" });
+  }
 
   function onScroll() {
     if (!scroller) return;
@@ -39,7 +50,7 @@
       <button class="earlier" onclick={() => (extra += pageSize)}>Show {Math.min(start, pageSize)} earlier messages</button>
     {/if}
     {#each visible as item (item.id)}
-      <Message {item} {diffs} {oncopy} {onpreview} />
+      <div data-item={item.id}><Message {item} {diffs} waiting={waitingIds.has(item.id)} {oncopy} {onpreview} /></div>
     {/each}
   </div>
 </div>
