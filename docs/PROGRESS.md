@@ -26,8 +26,9 @@ Legend: [x] done · [~] in progress · [ ] todo
 - [x] Stage 2: shell (sidebar holds all navigation, new toolbar with search bar, glass panels over a glow that turns amber while Claude waits, title bar follows the theme, Ctrl+B)
 - [x] Stage 3: conversation and right panel (session controls and activity in the panel, in the composer when it is closed; permission prompt order Deny, Always allow, Allow with nothing preselected)
 - [x] Stage 4: Home message box (Chat or Code, optional project, asks for a folder only when needed, keeps the draft if nothing was sent) and restyled Home and Usage
-- [ ] Stages 5 to 7: Settings and pages, usage widget, tray
-- Note: the E2E scenarios still use the old layout until stage 5
+- [x] Stage 5: Settings is a page with categories (Ctrl+, and Escape), Projects, Capabilities and Instructions are pages (unsaved Instructions text is kept while the app runs), dialogs take focus and close with Escape, custom themes say which colours are adjusted, E2E selectors updated
+- [x] Real-app E2E on the new layout (2026-11-26, Windows): `data`, `basic`, `caps`, `projects` passed. Not re-run: `attach`, `chat`, `limits`, `autorefresh`, `preview`, `probe`, `updater`, the real update-install test
+- [ ] Stages 6 and 7: usage widget, tray
 
 ## v0.1.0 release gate (owner decision, details in `docs/GOALS.md`)
 - [x] **In-app updater implemented and verified in the real app** (ADR 0003, `node tools/e2e.mjs updater`): signed updates, daily quiet check + manual check, release notes, progress, skip version; tampered / wrong-key / replayed installers rejected
