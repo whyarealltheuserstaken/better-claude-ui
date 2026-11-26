@@ -126,7 +126,8 @@ try {
 
   await page.getByRole("heading", { name: "Home" }).waitFor();
   step("Home visible, CLI detected");
-  await page.getByText(/Claude Code \d/).first().waitFor();
+  // Ask the app itself: where the version is shown depends on the Home layout the user has chosen.
+  await page.waitForFunction(async () => { const { app } = await import("/src/lib/store.svelte.ts"); return app.cli?.state === "found"; });
 
   if (scenario === "autorefresh") {
     const fsx = await import("node:fs");
