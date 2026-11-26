@@ -2,11 +2,13 @@
   import { onMount } from "svelte";
   import CapabilitiesPanel from "$lib/components/CapabilitiesPanel.svelte";
   import EditorPanel from "$lib/components/EditorPanel.svelte";
+  import ArchivePage from "$lib/components/ArchivePage.svelte";
+  import ImportPanel from "$lib/components/ImportPanel.svelte";
   import UpdatePanel from "$lib/components/UpdatePanel.svelte";
   import { reduceUpdate, shouldShowChip, progressFraction } from "$lib/updates";
   import ArtifactPreview from "$lib/components/ArtifactPreview.svelte";
   import ProjectsPanel from "$lib/components/ProjectsPanel.svelte";
-  import { pickFolder } from "$lib/ipc";
+  import { pickFolder, pickImportFile } from "$lib/ipc";
   import Palette from "$lib/components/Palette.svelte";
   import { allStyles, allThemes } from "$lib/theme";
   import type { PaletteItem } from "$lib/palette";
@@ -67,6 +69,9 @@
       { id: "new-code", label: "New coding session", group: "Start", keywords: "project folder", run: () => { app.setMode("code"); void app.newSession(); } },
       { id: "teams", label: "Agent teams", group: "Start", keywords: "preset research coordinator review", run: () => (app.showPresets = true) },
       { id: "projects", label: "Projects", group: "App", keywords: "instructions manage", run: () => (app.showProjects = true) },
+      { id: "archive", label: "Archive", group: "Go to", keywords: "imported conversations restored", run: () => app.go("archive") },
+      { id: "export", label: "Export all my data", group: "Your data", keywords: "backup save migrate", run: () => void app.exportAll() },
+      { id: "import", label: "Import data", group: "Your data", keywords: "restore claude chatgpt grok migrate", run: () => (app.showImport = true) },
       { id: "settings", label: "Settings", group: "App", keywords: "preferences appearance tier", run: () => (app.showSettings = true) },
     ];
     if (app.tier !== "beginner") {
@@ -99,6 +104,10 @@
   async function searchConversations(q: string): Promise<PaletteItem[]> {
     const hits = await ipc.searchConversations(q);
     return hits.flatMap((h) => {
+      if (h.archive) {
+        const a = app.archive.find((x) => x.id === h.cli_session_id);
+        return a ? [{ id: "hit-" + a.id, label: `${a.title}: ${h.snippet}`, group: "In archive", run: () => void app.openArchive(a.id) }] : [];
+      }
       const r = app.config.recents.find((x) => x.cli_session_id === h.cli_session_id);
       return r ? [{ id: "hit-" + h.cli_session_id, label: `${r.title}: ${h.snippet}`, group: "In conversation", run: () => void app.resume(r) }] : [];
     });
@@ -144,6 +153,8 @@
       onforget={(r) => app.forget(r)}
       onsettings={() => (app.showSettings = true)}
       onpresets={() => (app.showPresets = true)}
+      archiveCount={app.archive.length}
+      onarchive={() => app.go("archive")}
       advancedTools={app.tier !== "beginner"}
       oncaps={() => (app.showCaps = true)}
       oneditor={() => (app.showEditor = true)}
@@ -205,6 +216,18 @@
             onprojects={() => (app.showProjects = true)}
           />
         </div>
+      {:else if app.view === "archive"}
+        <ArchivePage
+          entries={app.archive}
+          viewing={app.viewing}
+          onopen={(id) => app.openArchive(id)}
+          onback={() => (app.viewing = null)}
+          ondelete={(id) => app.deleteArchive(id)}
+          oncontinue={(id) => app.continueFromArchive(id)}
+          onimport={() => (app.showImport = true)}
+          oncopy={(t) => app.copyText(t)}
+          onpreview={(code, lang) => (app.preview = { code, lang })}
+        />
       {:else if app.view === "usage"}
         <div class="scrollpage">
           <UsagePage
@@ -274,6 +297,17 @@
 {#if app.showPalette}
   <Palette items={paletteItems} search={searchConversations} onclose={() => (app.showPalette = false)} />
 {/if}
+{#if app.showImport}
+  <ImportPanel
+    pickFile={pickImportFile}
+    {pickFolder}
+    inspect={(p) => ipc.inspectImport(p)}
+    run={(p, o) => ipc.runImport(p, o)}
+    finish={(r) => app.finishImport(r)}
+    onopenarchive={() => app.go("archive")}
+    onclose={() => (app.showImport = false)}
+  />
+{/if}
 {#if app.showUpdate}
   <UpdatePanel
     state={app.update}
@@ -317,6 +351,9 @@
     update={app.update}
     oncheck={() => app.checkUpdates(true)}
     onviewupdate={() => { app.showSettings = false; app.showUpdate = true; }}
+    exportState={app.exportState}
+    onexport={() => app.exportAll()}
+    onimport={() => { app.showSettings = false; app.showImport = true; }}
     onsave={(patch) => app.updateConfig(patch)}
     onclose={() => (app.showSettings = false)}
   />

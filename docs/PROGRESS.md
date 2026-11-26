@@ -2,6 +2,14 @@
 
 Legend: [x] done · [~] in progress · [ ] todo
 
+## Data export and import (requested 2026-11-26; ADR 0004, spec in `docs/EXPORT_FORMAT.md`)
+- [x] Export all my data: restorable `backup.json`, documented `universal.json`, one Markdown file per conversation, README with a privacy note; never overwrites a folder
+- [x] Import: Claude.ai ZIP, ChatGPT ZIP/JSON (tree flattened to the branch you saw), BetterClaudeUI backup or export folder, Markdown/text, best-effort for other JSON (Grok exporters etc., with a warning); preview before anything is saved; re-imports add nothing
+- [x] Archive: read-only imported conversations (searchable, also in Ctrl+K), "Continue in a new chat" with the transcript attached; Archive link in the sidebar
+- [x] Safety: untrusted-input limits, allow-listed ZIP reads, restored settings can never re-enable "always allow", extra flags or bypass mode
+- [x] Verified in the real app in a throwaway profile (`node tools/e2e.mjs data`): ZIP + ChatGPT + Markdown import, duplicates skipped, junk refused, export files on disk, restore into the same profile adds nothing, and the real CLI used the imported transcript
+- [ ] Not verified: **real** Claude.ai / ChatGPT / Grok exports (tested only against fixtures built from community descriptions); Grok has no verified format
+
 ## v0.1.0 release gate (owner decision, details in `docs/GOALS.md`)
 - [x] **In-app updater implemented and verified in the real app** (ADR 0003, `node tools/e2e.mjs updater`): signed updates, daily quiet check + manual check, release notes, progress, skip version; tampered / wrong-key / replayed installers rejected
 - [x] Updater: GitHub signing secrets added; real install-and-relaunch verified on Windows (0.1.0 to 0.1.1, relaunched)

@@ -20,6 +20,7 @@ _(Screenshots use demo data.)_
 - **Usage and billing tracker:** tokens and estimated cost per day, model and project, plan allowance meters (5-hour and weekly), budgets and alerts.
 - **Home dashboard** with configurable widgets.
 - **Projects** with standing instructions, **search** across conversations, **Ctrl+K command palette**, **web search in Chat**, **attachments**, slash commands, MCP/skills panels, CLAUDE.md and settings editors.
+- **Export and import your data:** back up everything, move between computers, or bring conversations from Claude.ai, ChatGPT and other assistants into a searchable Archive you can continue from. See [docs/EXPORT_FORMAT.md](docs/EXPORT_FORMAT.md).
 - **In-app updates:** signed updates only, checked quietly once a day (can be turned off), nothing installs without your click.
 - **Setup wizard:** detects a missing or signed-out Claude Code and walks you through installing and signing in.
 - **Themes and styles:** 8 themes, 4 styles (including a Terminal look), all editable, importable and exportable.

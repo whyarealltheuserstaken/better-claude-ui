@@ -713,3 +713,76 @@ pub async fn install_update(
     update.install(&bytes).map_err(|e| updates::classify(&e))?;
     app.restart()
 }
+
+// ---- Export / import / archive ----------------------------------------------------------
+
+/// Write a full export (backup, universal JSON, Markdown files) into a new folder inside `folder`.
+#[tauri::command]
+pub async fn export_data(
+    app: AppHandle,
+    folder: String,
+) -> Result<crate::exchange::export::ExportResult, String> {
+    let version = app.package_info().version.to_string();
+    tokio::task::spawn_blocking(move || {
+        crate::exchange::export::export_all(
+            &platform::config_dir(),
+            std::path::Path::new(&folder),
+            (now_ms() / 1000) as i64,
+            &version,
+        )
+        .map_err(|e| format!("Couldn't write the export: {e}"))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Read a file, folder or ZIP and describe what is in it, without saving anything.
+#[tauri::command]
+pub async fn inspect_import(path: String) -> Result<crate::exchange::import::Inspection, String> {
+    tokio::task::spawn_blocking(move || {
+        let src = crate::exchange::import::read_source(std::path::Path::new(&path))?;
+        Ok(crate::exchange::import::inspect(
+            &crate::exchange::import::analyze(&src)?,
+        ))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Import into the Archive. Settings and projects are returned for the UI to merge into its own
+/// config (the UI owns the config file); usage and presets are written here.
+#[tauri::command]
+pub async fn run_import(
+    path: String,
+    options: crate::exchange::import::ImportOptions,
+) -> Result<crate::exchange::import::ImportResult, String> {
+    tokio::task::spawn_blocking(move || {
+        let dir = platform::config_dir();
+        let src = crate::exchange::import::read_source(std::path::Path::new(&path))?;
+        let analysis = crate::exchange::import::analyze(&src)?;
+        let native: std::collections::HashSet<String> = config::load(&dir)
+            .recents
+            .into_iter()
+            .map(|r| r.cli_session_id)
+            .collect();
+        crate::exchange::import::apply(analysis, &options, &dir, &native, (now_ms() / 1000) as i64)
+            .map_err(|e| format!("Couldn't save the imported data: {e}"))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub fn archive_list() -> Vec<crate::exchange::archive::ArchiveEntry> {
+    crate::exchange::archive::list(&platform::config_dir())
+}
+
+#[tauri::command]
+pub fn archive_get(id: String) -> Option<crate::exchange::archive::ArchiveDoc> {
+    crate::exchange::archive::get(&platform::config_dir(), &id)
+}
+
+#[tauri::command]
+pub fn archive_delete(id: String) -> Result<(), String> {
+    crate::exchange::archive::delete(&platform::config_dir(), &id).map_err(|e| e.to_string())
+}

@@ -1,3 +1,5 @@
+import type { ArchiveDoc, ArchiveEntry } from "./archive";
+import type { ExportResult, ImportOptions, ImportResult, Inspection } from "./exchange";
 import type { UpdateInfo } from "./updates";
 import type { AppConfig, AuthStatus, CliOutput, LimitsSnapshot, UsageSummary, Preset, ChatItem, CliStatus, FeatureInfo, SessionEventPayload, StartOptions } from "./types";
 
@@ -21,11 +23,17 @@ export const ipc = {
     invoke<void>("write_config_file", { target, project, content }),
   runCli: (args: string[], cwd: string | null) => invoke<CliOutput>("run_cli", { args, cwd }),
   openInTerminal: (cliSessionId: string, cwd: string | null) => invoke<void>("open_in_terminal", { cliSessionId, cwd }),
-  searchConversations: (query: string) => invoke<{ cli_session_id: string; snippet: string }[]>("search_conversations", { query }),
+  searchConversations: (query: string) => invoke<{ cli_session_id: string; snippet: string; archive?: boolean }[]>("search_conversations", { query }),
   appVersion: () => invoke<string>("app_version"),
   checkForUpdate: () => invoke<UpdateInfo>("check_for_update"),
   downloadUpdate: () => invoke<void>("download_update"),
   installUpdate: () => invoke<void>("install_update"),
+  exportData: (folder: string) => invoke<ExportResult>("export_data", { folder }),
+  inspectImport: (path: string) => invoke<Inspection>("inspect_import", { path }),
+  runImport: (path: string, options: ImportOptions) => invoke<ImportResult>("run_import", { path, options }),
+  archiveList: () => invoke<ArchiveEntry[]>("archive_list"),
+  archiveGet: (id: string) => invoke<ArchiveDoc | null>("archive_get", { id }),
+  archiveDelete: (id: string) => invoke<void>("archive_delete", { id }),
   listPresets: () => invoke<Preset[]>("list_presets"),
   getConfig: () => invoke<AppConfig>("get_config"),
   setConfig: (config: AppConfig) => invoke<void>("set_config", { config }),
@@ -84,4 +92,12 @@ export async function onUpdateProgress(handler: (downloaded: number, total: numb
   if (!inTauri()) return (await import("./mock")).mockUpdateProgress(handler);
   const { listen } = await import("@tauri-apps/api/event");
   return listen<{ downloaded: number; total: number | null }>("update-progress", (e) => handler(e.payload.downloaded, e.payload.total));
+}
+
+/** Pick a file to import (a ZIP, JSON or Markdown/text file). */
+export async function pickImportFile(): Promise<string | null> {
+  if (!inTauri()) return "C:\\demo\\claude-export.zip";
+  const { open } = await import("@tauri-apps/plugin-dialog");
+  const r = await open({ multiple: false, directory: false, filters: [{ name: "Chat exports", extensions: ["zip", "json", "md", "markdown", "txt"] }] });
+  return typeof r === "string" ? r : null;
 }

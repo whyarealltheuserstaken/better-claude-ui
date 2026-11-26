@@ -14,6 +14,11 @@ pub fn home() -> Option<PathBuf> {
 
 /// Per-user config directory for this app (not created).
 pub fn config_dir() -> PathBuf {
+    // Debug builds only: lets automated tests use a throwaway profile instead of the real one.
+    #[cfg(debug_assertions)]
+    if let Some(p) = std::env::var_os("BCU_CONFIG_DIR") {
+        return PathBuf::from(p);
+    }
     #[cfg(windows)]
     let base = std::env::var_os("APPDATA")
         .map(PathBuf::from)

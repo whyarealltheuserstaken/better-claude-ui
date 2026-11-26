@@ -7,6 +7,8 @@ use std::path::Path;
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Hit {
     pub cli_session_id: String,
+    /// True for imported or restored conversations (they live in the Archive).
+    pub archive: bool,
     /// A short excerpt around the first match.
     pub snippet: String,
 }
@@ -40,10 +42,10 @@ pub fn search(dir: &Path, query: &str) -> Vec<Hit> {
     if q.chars().count() < 2 {
         return vec![];
     }
-    let Ok(rd) = std::fs::read_dir(dir.join("transcripts")) else {
-        return vec![];
-    };
-    let mut files: Vec<_> = rd
+    // A missing transcripts folder (no live sessions yet) must not stop the archive from being searched.
+    let mut files: Vec<_> = std::fs::read_dir(dir.join("transcripts"))
+        .into_iter()
+        .flatten()
         .flatten()
         .filter(|e| e.path().extension().is_some_and(|x| x == "json"))
         .map(|e| {
@@ -53,7 +55,7 @@ pub fn search(dir: &Path, query: &str) -> Vec<Hit> {
         .collect();
     files.sort_by_key(|f| std::cmp::Reverse(f.0));
     let mut hits = vec![];
-    for (_, path) in files {
+    'files: for (_, path) in files {
         let Some(id) = path.file_stem().and_then(|s| s.to_str()).map(String::from) else {
             continue;
         };
@@ -73,11 +75,33 @@ pub fn search(dir: &Path, query: &str) -> Vec<Hit> {
         if let Some(snippet) = found {
             hits.push(Hit {
                 cli_session_id: id,
+                archive: false,
                 snippet,
             });
             if hits.len() >= MAX_HITS {
-                break;
+                break 'files;
             }
+        }
+    }
+    // Imported / restored conversations.
+    for e in crate::exchange::archive::list(dir) {
+        if hits.len() >= MAX_HITS {
+            break;
+        }
+        let Some(doc) = crate::exchange::archive::get(dir, &e.id) else {
+            continue;
+        };
+        let found = doc
+            .messages
+            .iter()
+            .find_map(|m| snippet(&m.text, &q))
+            .or_else(|| snippet(&e.title, &q));
+        if let Some(snippet) = found {
+            hits.push(Hit {
+                cli_session_id: e.id,
+                archive: true,
+                snippet,
+            });
         }
     }
     hits
@@ -152,6 +176,74 @@ mod tests {
     fn non_ascii_text_does_not_panic() {
         let s = snippet("İstanbul ünïcödé 日本語のテキスト needle ここ", "needle").unwrap();
         assert!(s.contains("needle"));
+    }
+
+    #[test]
+    fn archive_conversations_are_searchable_and_marked() {
+        use crate::exchange::{archive, model::Message};
+        let d = setup("archive", &[]);
+        archive::add(
+            &d,
+            vec![(
+                archive::ArchiveEntry {
+                    id: "imp-1".into(),
+                    title: "Trip".into(),
+                    source: "chatgpt".into(),
+                    created: None,
+                    updated: None,
+                    messages: 1,
+                    imported_at: 1,
+                },
+                archive::ArchiveDoc {
+                    messages: vec![Message {
+                        role: "assistant".into(),
+                        text: "Try Lisbon in spring".into(),
+                        at: None,
+                    }],
+                    items: None,
+                },
+            )],
+        )
+        .unwrap();
+        let hits = search(&d, "lisbon");
+        assert_eq!(hits.len(), 1);
+        assert!(hits[0].archive);
+        assert_eq!(hits[0].cli_session_id, "imp-1");
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn archive_is_searched_even_when_there_are_no_saved_sessions() {
+        use crate::exchange::{archive, model::Message};
+        let d = std::env::temp_dir().join(format!("bcu-search-noseessions-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).unwrap();
+        assert!(!d.join("transcripts").exists());
+        archive::add(
+            &d,
+            vec![(
+                archive::ArchiveEntry {
+                    id: "imp-9".into(),
+                    title: "T".into(),
+                    source: "claude.ai".into(),
+                    created: None,
+                    updated: None,
+                    messages: 1,
+                    imported_at: 1,
+                },
+                archive::ArchiveDoc {
+                    messages: vec![Message {
+                        role: "user".into(),
+                        text: "kumquat code".into(),
+                        at: None,
+                    }],
+                    items: None,
+                },
+            )],
+        )
+        .unwrap();
+        assert_eq!(search(&d, "kumquat").len(), 1);
+        let _ = std::fs::remove_dir_all(&d);
     }
 
     #[test]

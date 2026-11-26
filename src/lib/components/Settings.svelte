@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { type ExportResult, fmtBytes } from "../exchange";
   import { type UpdateState, describeUpdateStatus } from "../updates";
   import Appearance from "./Appearance.svelte";
   import { MODELS, PERMISSION_MODES, TIERS, splitArgs, type Tier } from "../tier";
@@ -10,6 +11,9 @@
     update = { phase: "idle" },
     oncheck = () => {},
     onviewupdate = () => {},
+    exportState = { phase: "idle" },
+    onexport = () => {},
+    onimport = () => {},
     onsave,
     onclose,
   }: {
@@ -18,6 +22,9 @@
     update?: UpdateState;
     oncheck?: () => void;
     onviewupdate?: () => void;
+    exportState?: { phase: "idle" | "working" | "done" | "error"; result?: ExportResult; error?: string };
+    onexport?: () => void;
+    onimport?: () => void;
     onsave: (patch: Partial<AppConfig>) => void;
     onclose: () => void;
   } = $props();
@@ -50,6 +57,20 @@
           <span><strong>{t.label}</strong><small>{t.blurb}</small></span>
         </label>
       {/each}
+    </section>
+
+    <section>
+      <h3>Your data</h3>
+      <p class="upd">Move your conversations, projects and settings to another computer or another assistant, or bring them here.</p>
+      <div class="updrow">
+        <button disabled={exportState.phase === "working"} onclick={onexport}>{exportState.phase === "working" ? "Exporting…" : "Export all my data…"}</button>
+        <button onclick={onimport}>Import data…</button>
+      </div>
+      {#if exportState.phase === "done" && exportState.result}
+        <p class="updstatus" role="status">Exported {exportState.result.conversations} conversation{exportState.result.conversations === 1 ? "" : "s"} ({fmtBytes(exportState.result.bytes)}) to <code>{exportState.result.folder}</code>. It contains your conversations, so keep it private.</p>
+      {:else if exportState.phase === "error"}
+        <p class="updstatus bad" role="alert">{exportState.error}</p>
+      {/if}
     </section>
 
     <section>

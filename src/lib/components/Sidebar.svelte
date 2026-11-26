@@ -13,6 +13,8 @@
     onforget,
     onsettings,
     onpresets,
+    archiveCount = 0,
+    onarchive = () => {},
     advancedTools = false,
     oncaps,
     oneditor,
@@ -30,6 +32,8 @@
     onforget: (r: SavedSession) => void;
     onsettings: () => void;
     onpresets: () => void;
+    archiveCount?: number;
+    onarchive?: () => void;
     advancedTools?: boolean;
     oncaps: () => void;
     oneditor: () => void;
@@ -43,6 +47,7 @@
   <div class="brand">Better<span>Claude</span>UI</div>
   <button class="new" onclick={onnew}>{mode === "chat" ? "New chat" : "New session"}</button>
   {#if mode === "code"}<button class="presets" onclick={onpresets}>Agent teams</button>{/if}
+  <button class="presets" onclick={onarchive}>Archive{archiveCount > 0 ? ` (${archiveCount})` : ""}</button>
   {#if advancedTools}
     <button class="presets" onclick={oncaps}>Capabilities</button>
     <button class="presets" onclick={oneditor}>Instructions and settings</button>

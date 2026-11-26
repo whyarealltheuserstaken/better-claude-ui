@@ -1,6 +1,6 @@
 // End-to-end test of the REAL app against the REAL `claude` CLI, driven over WebView2's debug port.
 // Windows: starts `npm run tauri dev` itself. Usage: node tools/e2e.mjs
-// Scenarios: `node tools/e2e.mjs` (permission flow, default), `attach` (image + text attachments in Chat), `caps` (slash menu, capabilities panel, CLAUDE.md editor), `chat` (palette, web search in Chat, tool lockdown, export), `projects` (project instructions applied to a chat, conversation search), `updater` (in-app updater against a local signed test server; never installs anything).
+// Scenarios: `node tools/e2e.mjs` (permission flow, default), `attach` (image + text attachments in Chat), `caps` (slash menu, capabilities panel, CLAUDE.md editor), `chat` (palette, web search in Chat, tool lockdown, export), `projects` (project instructions applied to a chat, conversation search), `data` (export, import of Claude.ai/ChatGPT/Markdown files, archive, continue in a new chat; runs in a THROWAWAY profile), `updater` (in-app updater against a local signed test server; never installs anything).
 // Uses your claude login (a few cents of tokens). Exits non-zero on failure.
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, rmSync, readFileSync } from "node:fs";
@@ -16,6 +16,41 @@ const PORT = Number(process.env.E2E_PORT ?? 9477);
 const work = join(tmpdir(), "bcu-e2e-work");
 rmSync(work, { recursive: true, force: true });
 mkdirSync(work, { recursive: true });
+
+let dataProfile = null;
+let dataInbox = null;
+if (scenario === "data") {
+  const { writeFileSync } = await import("node:fs");
+  const { execFileSync } = await import("node:child_process");
+  dataProfile = join(tmpdir(), `bcu-e2e-data-${process.pid}`);
+  dataInbox = join(tmpdir(), `bcu-e2e-data-inbox-${process.pid}`);
+  rmSync(dataProfile, { recursive: true, force: true });
+  rmSync(dataInbox, { recursive: true, force: true });
+  mkdirSync(dataProfile, { recursive: true });
+  mkdirSync(join(dataInbox, "stage"), { recursive: true });
+  writeFileSync(join(dataProfile, "config.json"), JSON.stringify({ onboarded: true, tier: "intermediate", auto_update_check: false }));
+  process.env.BCU_CONFIG_DIR = dataProfile; // debug-only override: the real profile is never touched
+  const claude = [
+    { uuid: "c1", name: "Launch plan", created_at: "2026-03-01T10:00:00Z", updated_at: "2026-03-01T10:10:00Z", chat_messages: [
+      { sender: "human", text: "Remember the launch code KUMQUAT-7731 for later, and that the launch is on a Tuesday.", created_at: "2026-03-01T10:00:00Z" },
+      { sender: "assistant", text: "Noted: launch code KUMQUAT-7731, launching on a Tuesday.", created_at: "2026-03-01T10:00:20Z" } ] },
+    { uuid: "c2", name: "Recipe ideas", created_at: "2026-03-02T09:00:00Z", chat_messages: [
+      { sender: "human", text: "Give me a quick pasta idea." }, { sender: "assistant", text: "Garlic, olive oil and chilli." } ] },
+  ];
+  writeFileSync(join(dataInbox, "stage", "conversations.json"), JSON.stringify(claude));
+  writeFileSync(join(dataInbox, "stage", "projects.json"), JSON.stringify([{ uuid: "p1", name: "Launch Project", description: "d", prompt_template: "Always answer in plain English." }]));
+  writeFileSync(join(dataInbox, "stage", "users.json"), JSON.stringify([{ email: "private@example.com" }]));
+  execFileSync("powershell", ["-NoProfile", "-Command", `Compress-Archive -Path '${join(dataInbox, "stage")}\\*' -DestinationPath '${join(dataInbox, "claude-export.zip")}'`]);
+  const gpt = [{ title: "Plan a trip", create_time: 1700000000, conversation_id: "g1", current_node: "a2", mapping: {
+    root: { id: "root", message: null, parent: null, children: ["u1"] },
+    u1: { id: "u1", parent: "root", children: ["a1", "a2"], message: { author: { role: "user" }, content: { content_type: "text", parts: ["Where should I go?"] } } },
+    a1: { id: "a1", parent: "u1", children: [], message: { author: { role: "assistant" }, content: { content_type: "text", parts: ["OLD answer"] } } },
+    a2: { id: "a2", parent: "u1", children: [], message: { author: { role: "assistant" }, content: { content_type: "text", parts: ["Try Lisbon."] } } } } }];
+  writeFileSync(join(dataInbox, "chatgpt-conversations.json"), JSON.stringify(gpt));
+  writeFileSync(join(dataInbox, "notes.md"), "# Meeting notes\n\n## You\n\nSummarise the meeting.\n\n## Assistant\n\nThree action items.\n");
+  writeFileSync(join(dataInbox, "bad.json"), "{\"hello\": \"world\"}");
+  mkdirSync(join(dataInbox, "out"), { recursive: true });
+}
 
 let updateServer = null;
 if (scenario === "updater") {
@@ -71,6 +106,165 @@ try {
   await page.getByRole("heading", { name: "Home" }).waitFor();
   step("Home visible, CLI detected");
   await page.getByText(/Claude Code \d/).first().waitFor();
+
+  if (scenario === "data") {
+    const fsx = await import("node:fs");
+    const expect = (cond, msg) => { if (!cond) throw new Error(msg); };
+    page.on("dialog", (d) => d.accept()); // confirm() prompts (Remove from archive)
+    // Route the native file/folder dialogs to paths chosen by this test. (The Tauri bridge itself is
+    // immutable, so the dialog plugin module is replaced at the network layer instead.)
+    await page.evaluate(() => { window.__pick = { file: null, dir: null }; });
+    await page.route(/plugin-dialog.js/, (route) =>
+      route.fulfill({ contentType: "text/javascript", body: "export async function open(o) { return o && o.directory ? window.__pick.dir : window.__pick.file; } export async function save() { return null; } export async function message() {} export async function ask() { return true; } export async function confirm() { return true; }" }),
+    );
+    const pick = (kind, path) => page.evaluate(([k, p]) => { window.__pick[k] = p; }, [kind, path]);
+    const panel = page.getByRole("dialog", { name: "Import data" });
+    const importFile = async (path, choose = "Choose a file…") => {
+      await pick(choose.includes("folder") ? "dir" : "file", path);
+      await panel.getByRole("button", { name: choose }).click();
+    };
+
+    // 1. The archive starts empty and offers an import.
+    await page.getByRole("button", { name: /^Archive/ }).first().click();
+    await page.getByText("Nothing here yet").waitFor();
+    await page.getByRole("button", { name: "Import data" }).click();
+    await panel.waitFor();
+    step("archive starts empty; import panel opened");
+
+    // 2. A Claude.ai-style ZIP: preview first, nothing saved yet.
+    await importFile(join(dataInbox, "claude-export.zip"));
+    await page.waitForFunction(() => { const d = document.querySelector('[aria-label="Import data"]'); return d && ([...d.querySelectorAll("button")].some((b) => b.textContent.trim() === "Import") || d.querySelector('[role="alert"]')); });
+    if (await panel.getByRole("alert").count()) throw new Error("import preview failed: " + (await panel.getByRole("alert").innerText()) + " | zip entries: " + (await import("node:child_process")).execFileSync("powershell", ["-NoProfile", "-Command", "Add-Type -A System.IO.Compression.FileSystem; [IO.Compression.ZipFile]::OpenRead('" + join(dataInbox, "claude-export.zip") + "').Entries.FullName -join ', '"]).toString().trim());
+    let txt = await panel.innerText();
+    step("preview: " + txt.replace(/\s+/g, " ").slice(0, 150));
+    expect(/Claude\.ai export/.test(txt) && /2 conversations/.test(txt), "expected a Claude.ai export with 2 conversations");
+    expect(/Projects \(1\)/.test(txt), "expected 1 project");
+    expect(!/private@example\.com/.test(txt), "account details must never be read");
+    expect(!fsx.existsSync(join(dataProfile, "archive")), "the preview must not save anything");
+    await panel.getByRole("button", { name: "Import", exact: true }).click();
+    await panel.getByText("Done.").waitFor();
+    txt = await panel.innerText();
+    step("imported: " + txt.replace(/\s+/g, " ").slice(0, 120));
+    expect(/2 conversations added to your Archive/.test(txt) && /1 project added/.test(txt), "unexpected import summary");
+    await panel.getByRole("button", { name: "Open Archive" }).click();
+    await page.getByText("Launch plan").first().waitFor();
+
+    // 3. ChatGPT tree (branch flattened) and a Markdown transcript, from the Archive page.
+    await page.getByRole("button", { name: "Import…" }).click();
+    await importFile(join(dataInbox, "chatgpt-conversations.json"));
+    await panel.getByRole("button", { name: "Import", exact: true }).waitFor();
+    expect(/latest branch/.test(await panel.innerText()), "expected the branch warning for ChatGPT");
+    await panel.getByRole("button", { name: "Import", exact: true }).click();
+    await panel.getByText("Done.").waitFor();
+    await panel.getByRole("button", { name: "Close", exact: true }).first().click();
+    await page.getByRole("button", { name: "Import…" }).click();
+    await importFile(join(dataInbox, "notes.md"));
+    await panel.getByRole("button", { name: "Import", exact: true }).click();
+    await panel.getByText("Done.").waitFor();
+    await panel.getByRole("button", { name: "Close", exact: true }).first().click();
+    await page.getByText("Plan a trip").first().waitFor();
+    await page.getByText("Meeting notes").first().waitFor();
+    step("ChatGPT export (branch flattened) and Markdown note imported; archive has 4");
+
+    // 4. Importing the same ZIP again adds nothing; junk is refused with a clear message.
+    await page.getByRole("button", { name: "Import…" }).click();
+    await importFile(join(dataInbox, "claude-export.zip"));
+    await panel.getByRole("button", { name: "Import", exact: true }).click();
+    await panel.getByText("Done.").waitFor();
+    expect(/2 already here, skipped/.test(await panel.innerText()), "re-import should skip duplicates");
+    step("re-import: 2 already here, skipped");
+    await panel.getByRole("button", { name: "Close", exact: true }).first().click();
+    await page.getByRole("button", { name: "Import…" }).click();
+    await importFile(join(dataInbox, "bad.json"));
+    await panel.getByRole("alert").waitFor();
+    expect(/doesn't look like a chat export/.test(await panel.getByRole("alert").innerText()), "expected a clear error for a junk file");
+    step("junk file refused with a clear message");
+    await panel.locator("button.x").click();
+
+    // 5. Filter, open (read-only), and search by content.
+    const filter = page.getByLabel("Filter conversations");
+    await filter.fill("launch");
+    expect((await page.locator("aside li button.item").count()) === 1, "filter should leave one conversation");
+    await page.locator("aside li button.item").first().click();
+    await page.getByText("KUMQUAT-7731").first().waitFor();
+    expect(/Read-only/.test(await page.locator(".viewer").innerText()), "viewer should say read-only");
+    await filter.fill("");
+    await page.keyboard.press("Control+k");
+    await page.getByLabel("Search commands").fill("kumquat");
+    await page.getByRole("option").filter({ hasText: "kumquat" }).first().waitFor({ timeout: 15000 });
+    step("filter, read-only viewer and palette search (by content) all work");
+    await page.keyboard.press("Escape");
+
+    // 6. Export everything, then check the files on disk.
+    await pick("dir", join(dataInbox, "out"));
+    await page.getByRole("button", { name: "Settings", exact: true }).click();
+    const settings = page.getByRole("dialog", { name: "Settings" });
+    await settings.getByRole("button", { name: "Export all my data…" }).click();
+    await settings.getByText(/Exported 4 conversations/).waitFor();
+    const folders = fsx.readdirSync(join(dataInbox, "out"));
+    expect(folders.length === 1 && folders[0].startsWith("better-claude-ui-export-"), "expected one export folder, got " + folders);
+    const ex = join(dataInbox, "out", folders[0]);
+    for (const f of ["backup.json", "universal.json", "README.txt"]) expect(fsx.existsSync(join(ex, f)), f + " missing");
+    const universal = JSON.parse(fsx.readFileSync(join(ex, "universal.json"), "utf8"));
+    expect(universal.format === "universal-chat-export" && universal.conversations.length === 4, "universal.json should hold 4 conversations");
+    const mds = fsx.readdirSync(join(ex, "conversations"));
+    expect(mds.length === 4 && mds.some((m) => /Launch plan/.test(m)), "expected 4 readable markdown files");
+    expect(fsx.readFileSync(join(ex, "conversations", mds.find((m) => /Launch plan/.test(m))), "utf8").includes("KUMQUAT-7731"), "markdown should contain the conversation text");
+    const backupText = fsx.readFileSync(join(ex, "backup.json"), "utf8");
+    expect(!/private@example\.com/.test(backupText), "account details must not be in the export");
+    step(`export: ${folders[0]} with backup.json, universal.json, ${mds.length} markdown files, README.txt`);
+    await settings.getByRole("button", { name: "Close settings" }).click();
+
+    // 7. Importing that export folder back must not duplicate anything.
+    await page.getByRole("button", { name: "Import…" }).click();
+    await importFile(ex, "Choose a folder…");
+    await panel.getByRole("button", { name: "Import", exact: true }).waitFor();
+    expect(/BetterClaudeUI backup/.test(await panel.innerText()), "expected a BetterClaudeUI backup");
+    await panel.getByRole("button", { name: "Import", exact: true }).click();
+    await panel.getByText("Done.").waitFor();
+    txt = await panel.innerText();
+    expect(/4 already here, skipped/.test(txt) && !/conversations? added to your Archive/.test(txt), "restoring into the same profile must not duplicate: " + txt);
+    step("restoring the export into the same profile: 4 already here, nothing duplicated");
+    await panel.getByRole("button", { name: "Close", exact: true }).first().click();
+
+    // 8. Continue an archived conversation in a new chat: the real CLI must see the transcript.
+    await page.getByLabel("Filter conversations").fill("launch");
+    await page.locator("aside li button.item").first().click();
+    await page.getByRole("button", { name: "Continue in a new chat" }).click();
+    await page.getByRole("button", { name: "Send" }).waitFor();
+    const reply = (await page.locator(".assistant").last().innerText()).toLowerCase();
+    step("continued chat replied: " + reply.replace(/\s+/g, " ").trim().slice(0, 140));
+    expect(reply.includes("kumquat-7731") || (reply.includes("kumquat") && reply.includes("tuesday")), "the model did not see the archived transcript");
+
+    // 9. Remove from the archive.
+    await page.getByRole("button", { name: /^Archive/ }).first().click();
+    await page.getByLabel("Filter conversations").fill("meeting");
+    await page.locator("aside li button.item").first().click();
+    await page.getByRole("button", { name: "Remove" }).click();
+    await page.getByLabel("Filter conversations").fill("");
+    await page.waitForFunction(() => document.querySelectorAll("aside li button.item").length === 3);
+    step("removed one conversation; 3 remain");
+
+    // cleanup: the throwaway profile and the CLI's own record of the chat started in it
+    const { homedir } = await import("node:os");
+    const slug = dataProfile.replace(/[^A-Za-z0-9]/g, "-") + "-chat";
+    const cliDir = join(homedir(), ".claude", "projects", slug);
+    if (slug.includes("bcu-e2e-data") && fsx.existsSync(cliDir)) rmSync(cliDir, { recursive: true, force: true });
+    // Stop the app first (it holds the profile folder open), then remove the throwaway data.
+    spawn("taskkill", ["/F", "/T", "/PID", String(app.pid)], { stdio: "ignore" });
+    spawn("taskkill", ["/F", "/IM", "better-claude-ui.exe"], { stdio: "ignore" });
+    for (let i = 0; i < 10; i++) {
+      await new Promise((r) => setTimeout(r, 1500));
+      try {
+        rmSync(dataProfile, { recursive: true, force: true });
+        rmSync(dataInbox, { recursive: true, force: true });
+        break;
+      } catch { /* still closing */ }
+    }
+    console.log("E2E DATA PASSED");
+    cleanup(0);
+    await new Promise(() => {});
+  }
 
   if (scenario === "updater") {
     const before = await page.evaluate(async () => {

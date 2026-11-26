@@ -107,6 +107,30 @@ export async function mockInvoke<T>(cmd: string, args?: Record<string, unknown>)
     }
     case "install_update":
       return undefined as T;
+    case "export_data":
+      await wait(500);
+      return { folder: (args!.folder as string) + "\\better-claude-ui-export-20261126-120000", conversations: 14, files: 19, bytes: 482113 } as T;
+    case "inspect_import": {
+      await wait(300);
+      const p = String(args!.path);
+      if (p.includes("bad")) throw "This file doesn't look like a chat export we can read. Supported: Claude.ai and ChatGPT exports (the .zip or conversations.json), this app's backup, and Markdown or text transcripts.";
+      const backup = p.includes("backup");
+      return { format: backup ? "BetterClaudeUI backup" : "Claude.ai export", source: backup ? "better-claude-ui" : "claude.ai", conversations: 42, messages: 380, projects: backup ? 2 : 3, has_settings: backup, usage_records: backup ? 120 : 0, presets: backup ? 1 : 0, date_from: 1700000000, date_to: 1795000000, samples: ["Fix the login redirect", "Trip to Lisbon", "Explain WebView2 memory", "Draft a cover letter", "Refactor the parser"], warnings: backup ? [] : ["Attached files are listed by name only; their contents are not imported.", "Project documents are not imported, only project names and instructions."], files: [backup ? "backup.json" : "conversations.json", "projects.json"] } as T;
+    }
+    case "run_import":
+      await wait(500);
+      localStorage.setItem("mock_archive_added", "1");
+      return { conversations_added: 41, duplicates_skipped: 1, projects: [{ name: "Marketing", instructions: "Plain English." }, { name: "Research", instructions: "Cite sources." }], settings: (args!.options as { settings: boolean }).settings ? { theme: "midnight", tier: "advanced" } : null, usage_added: 0, presets_added: 0, warnings: [] } as T;
+    case "archive_list":
+      return (localStorage.getItem("mock_archive_added") ? [
+        { id: "imp-1", title: "Fix the login redirect", source: "claude.ai", created: 1795000000, updated: 1795001000, messages: 6, imported_at: 1795100000 },
+        { id: "imp-2", title: "Trip to Lisbon", source: "chatgpt", created: 1790000000, updated: 1790001000, messages: 4, imported_at: 1795100000 },
+        { id: "imp-3", title: "Notes from a meeting", source: "markdown", created: null, updated: null, messages: 1, imported_at: 1795100000 },
+      ] : []) as T;
+    case "archive_get":
+      return { messages: [{ role: "user", text: "How should I handle the login redirect after a session timeout?" }, { role: "assistant", text: "Redirect to the login page and keep the original URL in a `next` parameter, then send the user back after sign-in.\n\n```ts\nconst next = encodeURIComponent(location.pathname);\n```" }, { role: "user", text: "And for API calls?" }, { role: "assistant", text: "Return 401 and let the client trigger the same redirect." }] } as T;
+    case "archive_delete":
+      return undefined as T;
     case "list_presets":
       return [{ id: "deep-research", title: "Deep Research", description: "Mock preset", cost_note: "Costs more", agents: { researcher: { description: "r", prompt: "p" } }, system_prompt: "s", custom: false }] as T;
     case "get_config":
