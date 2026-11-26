@@ -213,6 +213,15 @@ The parser, broker and registry were written test-first with a RED run observed.
 - **Key backup (2026-11-26):** `C:\ProgramData\BetterClaudeUI\updater-key-backup\` (read-only; normal account cannot delete/overwrite/rename; verified). `node tools/check-updater-key.mjs` checks key/backup/public-key/secrets consistency and that the backup can actually sign. Recovery steps are in `docs/RELEASING.md`. Note the password is stored beside the key locally, so this protects against accidental deletion and profile corruption, not against someone with access to the machine, and not against losing the machine: an off-machine copy is still open.
 - Keys live outside the repo in `%USERPROFILE%\.bcu-updater\` on the machine that generated them; `*.key` is gitignored. Never print or paste them.
 
+## 10m. UI and UX revamp (in progress)
+- Spec and plan: `docs/superpowers/specs/2026-11-26-ui-revamp-design.md`, `docs/superpowers/plans/2026-11-26-ui-revamp.md`. Progress log (local, git-ignored): `.superpowers/sdd/2026-11-26-ui-revamp/progress.md`.
+- **Done:** stages 1 to 4 (design system, shell, conversation and right panel, Home and Usage). **Next:** Task 10 onward (Settings and other pages, remaining dialogs and screens, usage widget, tray).
+- **Verified only** by Vitest, type check, CI and screenshots against the browser mock backend (`npm run dev`, then `node tools/screenshots.mjs <dir>`). The revamped UI has **not** been run as the real Tauri app, so the title bar theme and real sessions are unchecked.
+- `tools/e2e.mjs` still uses the old layout; update it in Task 12.
+- Until Task 10/11: Settings, Projects, Capabilities and Instructions are still pop-ups, and the Claude Code version shows only in the Home "Setup status" widget.
+- The whole-branch review at the end of the plan has not happened yet.
+- Shell heredocs fail on long scripts here: use the Write tool for those.
+
 ## 11. Next steps (in order)
 1. ~~Build the in-app updater~~ **Done and verified** (ADR 0003). Key safety: a protected read-only local backup exists and `node tools/check-updater-key.mjs` verifies it; still open is an off-machine copy of the key (owner's choice). See "Updater status" in `docs/GOALS.md`.
 1b. **Now: the UI and UX revamp** (spec and plan dated 2026-11-26 in `docs/superpowers/`). **Then the extra features the owner is defining** (listed in `docs/GOALS.md`). Development stays with Claude Code on one device.
