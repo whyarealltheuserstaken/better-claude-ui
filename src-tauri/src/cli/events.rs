@@ -99,6 +99,16 @@ pub enum Event {
         text: String,
         parent_tool_use_id: Option<String>,
     },
+    /// Token counts for one model step. A `start` opens the step; later reports carry running
+    /// totals for that same step, so they replace the counts and must not be added to them.
+    StepUsage {
+        start: bool,
+        input: u64,
+        output: u64,
+        cache_read: u64,
+        cache_write: u64,
+        parent_tool_use_id: Option<String>,
+    },
     ThinkingDelta {
         text: String,
         parent_tool_use_id: Option<String>,
@@ -236,6 +246,22 @@ fn interpret(v: Value) -> Vec<Event> {
                     }
                     _ => {}
                 }
+            }
+            let usage = match ety.as_str() {
+                "message_start" => ev.pointer("/message/usage"),
+                "message_delta" => ev.get("usage"),
+                _ => None,
+            };
+            if let Some(u) = usage.filter(|u| u.is_object()) {
+                let n = |k: &str| u.get(k).and_then(Value::as_u64).unwrap_or(0);
+                return vec![Event::StepUsage {
+                    start: ety == "message_start",
+                    input: n("input_tokens"),
+                    output: n("output_tokens"),
+                    cache_read: n("cache_read_input_tokens"),
+                    cache_write: n("cache_creation_input_tokens"),
+                    parent_tool_use_id: parent(&v),
+                }];
             }
             vec![Event::Info {
                 subtype: if ety.is_empty() {
@@ -509,12 +535,73 @@ mod tests {
     const SIMPLE: &str = include_str!("../../tests/fixtures/simple_reply.jsonl");
     const ALLOW: &str = include_str!("../../tests/fixtures/tool_permission_allow.jsonl");
     const ERROR: &str = include_str!("../../tests/fixtures/error_model.jsonl");
+    const USAGE: &str = include_str!("../../tests/fixtures/usage_subagent.jsonl");
 
     fn all(fixture: &str) -> Vec<Event> {
         fixture
             .lines()
             .flat_map(|l| parse_line(l).expect("fixture line parses"))
             .collect()
+    }
+
+    fn step(
+        start: bool,
+        input: u64,
+        output: u64,
+        cache_read: u64,
+        cache_write: u64,
+        parent: Option<&str>,
+    ) -> Event {
+        Event::StepUsage {
+            start,
+            input,
+            output,
+            cache_read,
+            cache_write,
+            parent_tool_use_id: parent.map(str::to_string),
+        }
+    }
+
+    #[test]
+    fn parses_step_usage_from_the_recorded_fixture() {
+        let steps: Vec<Event> = all(USAGE)
+            .into_iter()
+            .filter(|e| matches!(e, Event::StepUsage { .. }))
+            .collect();
+        assert_eq!(
+            steps,
+            vec![
+                step(true, 2, 4, 15027, 7567, None),
+                step(false, 2, 291, 15027, 7567, None),
+                step(true, 2, 8, 22594, 559, None),
+                step(false, 2, 44, 22594, 559, None),
+            ]
+        );
+    }
+
+    #[test]
+    fn step_usage_treats_missing_fields_as_zero_and_keeps_the_parent() {
+        let line = r#"{"type":"stream_event","event":{"type":"message_delta","usage":{"output_tokens":7}},"parent_tool_use_id":"toolu_1"}"#;
+        assert_eq!(
+            parse_line(line).unwrap(),
+            vec![step(false, 0, 7, 0, 0, Some("toolu_1"))]
+        );
+    }
+
+    #[test]
+    fn stream_events_without_usage_stay_informational() {
+        for line in [
+            r#"{"type":"stream_event","event":{"type":"message_start","message":{}}}"#,
+            r#"{"type":"stream_event","event":{"type":"message_delta","usage":null}}"#,
+            r#"{"type":"stream_event","event":{"type":"message_delta","usage":"lots"}}"#,
+            r#"{"type":"stream_event","event":{"type":"message_stop"}}"#,
+        ] {
+            let ev = parse_line(line).unwrap();
+            assert!(
+                matches!(ev.as_slice(), [Event::Info { .. }]),
+                "{line}: {ev:?}"
+            );
+        }
     }
 
     #[test]

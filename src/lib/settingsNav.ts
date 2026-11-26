@@ -4,11 +4,12 @@ import type { IconName } from "./ui/icons";
 
 export type SettingsCategory = "general" | "appearance" | "usage" | "widget" | "data" | "updates";
 
-/** In display order. "widget" is listed once the usage widget exists. */
+/** In display order. */
 export const CATEGORIES: { id: SettingsCategory; label: string; icon: IconName }[] = [
   { id: "general", label: "General", icon: "sliders" },
   { id: "appearance", label: "Appearance", icon: "palette" },
   { id: "usage", label: "Usage and budgets", icon: "wallet" },
+  { id: "widget", label: "Usage widget", icon: "gauge" },
   { id: "data", label: "Your data", icon: "database" },
   { id: "updates", label: "Updates", icon: "refresh" },
 ];

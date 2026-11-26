@@ -262,6 +262,15 @@ fn rank(map: HashMap<String, Totals>, limit: usize) -> Vec<Named> {
     v
 }
 
+/// Everything recorded for one conversation. `session` is the CLI's session id, as stored in the ledger.
+pub fn session_totals(records: &[Record], session: &str) -> Totals {
+    let mut totals = Totals::default();
+    for r in records.iter().filter(|r| r.session == session) {
+        totals.add(r);
+    }
+    totals
+}
+
 pub fn summarize(records: &[Record], now_ms: u64, offset_min: i32, days: u32) -> Summary {
     let days = days.clamp(1, 365);
     let today = local_day(now_ms, offset_min);
@@ -339,6 +348,21 @@ mod tests {
             cost_usd: cost,
             ..Default::default()
         }
+    }
+
+    #[test]
+    fn session_totals_add_only_that_sessions_records() {
+        let mut other = rec(NOW, "a", None, 5.0, 500);
+        other.session = "other".into();
+        let records = vec![
+            rec(NOW - DAY, "a", None, 0.5, 20),
+            rec(NOW, "b", None, 0.25, 30),
+            other,
+        ];
+        let t = session_totals(&records, "s");
+        assert_eq!((t.input, t.output, t.turns), (20, 50, 2));
+        assert!((t.cost_usd - 0.75).abs() < 1e-9);
+        assert_eq!(session_totals(&records, "unknown"), Totals::default());
     }
 
     fn rec(ts: u64, model: &str, project: Option<&str>, cost: f64, out: u64) -> Record {

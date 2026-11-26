@@ -7,10 +7,14 @@ export type Block =
   | { kind: "thinking"; text: string }
   | { kind: "tool_use"; id: string; name: string; input: Record<string, unknown> };
 
+/** Token counts, split the way the CLI reports them. */
+export type TokenSplit = { input: number; output: number; cache_read: number; cache_write: number };
+
 export type CliEvent =
   | { kind: "session_init"; session_id: string; model: string; cwd: string; caps?: Capabilities }
   | { kind: "text_delta"; text: string; parent_tool_use_id: string | null }
   | { kind: "thinking_delta"; text: string; parent_tool_use_id: string | null }
+  | ({ kind: "step_usage"; start: boolean; parent_tool_use_id: string | null } & TokenSplit)
   | { kind: "assistant_message"; blocks: Block[]; parent_tool_use_id: string | null }
   | { kind: "tool_result"; tool_use_id: string; output: string; is_error: boolean; parent_tool_use_id: string | null }
   | {
@@ -30,6 +34,8 @@ export type CliEvent =
       session_id: string;
       duration_ms?: number | null;
       num_turns?: number | null;
+      /** Totals per model for the whole session process so far (not just this reply). */
+      models?: (TokenSplit & { model: string; web_searches: number; cost_usd: number })[];
     }
   | { kind: "initialized"; info: InitInfo }
   | { kind: "rate_limit"; status: string; windows: RateWindow[]; using_overage: boolean }
@@ -109,6 +115,10 @@ export interface SessionState {
   info: InitInfo | null;
   /** Cumulative API-equivalent cost of this session process, USD. */
   costUsd: number;
+  /** Tokens of the current reply: finished steps, plus open ones keyed by helper id ("" is the main agent). */
+  reply: { done: TokenSplit; open: Record<string, TokenSplit> } | null;
+  /** The session process's totals at the last finished reply. */
+  modelTotals: TokenSplit | null;
   /** Capped log of raw events for Advanced view. */
   raw: SessionEvent[];
   nextId: number;

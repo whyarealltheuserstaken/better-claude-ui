@@ -6,10 +6,12 @@ import { MAX_FAILURES, shouldAutoRefresh } from "./limits";
 import { type ExportResult, type ImportResult, mergeProjects, settingsPatch } from "./exchange";
 import { ipc, onSessionEvent, onUpdateProgress, pickFolder } from "./ipc";
 import { type UpdateProblem, type UpdateState, installBlockedReason, reduceUpdate, shouldAutoCheck } from "./updates";
-import { addUserMessage, initialState, reduce, removePending, restoreItems } from "./reducer";
+import { addUserMessage, initialState, reduce, removePending, replyTokens, restoreItems } from "./reducer";
+import { type WidgetSettings, sanitizeWidget } from "./widget/config";
+import { type WidgetData, sessionSplit, widgetStatus } from "./widget/readings";
 import { type Caps, capsFor, normalizeTier } from "./tier";
 import { type PageView, type View, isPage } from "./settingsNav";
-import type { AppConfig, AuthStatus, LimitsSnapshot, UsageSummary, ChatItem, Preset, CliStatus, Mode, SavedSession, SessionState, StartOptions } from "./types";
+import type { AppConfig, AuthStatus, LimitsSnapshot, SessionEventPayload, Totals, UsageSummary,ChatItem, Preset, CliStatus, Mode, SavedSession, SessionState, StartOptions } from "./types";
 
 export interface SessionMeta {
   id: string;
@@ -113,20 +115,63 @@ class AppStore {
     ),
   );
 
+  // ---- Usage widget ----
+  showWidgetCustomize = $state(false);
+  /** Usage-log totals per conversation, keyed by the CLI's session id. */
+  sessionLedger = $state<Record<string, Totals>>({});
+  /** Conversations with a finished reply that the log has not been read again for. */
+  sessionStale = $state<Record<string, boolean>>({});
+  widget = $derived(sanitizeWidget(this.config.usage_widget));
+  widgetState = $derived(widgetStatus(this.states));
+  widgetData = $derived.by((): WidgetData => {
+    const s = this.active;
+    const cid = s?.cliSessionId ?? null;
+    const reply = s ? replyTokens(s) : null;
+    const unlogged = s?.status === "running" || (!!cid && this.sessionStale[cid] === true);
+    return {
+      reply,
+      session: s ? sessionSplit(cid ? (this.sessionLedger[cid] ?? null) : null, reply, unlogged) : null,
+      sessionCost: s && s.costUsd > 0 ? s.costUsd : null,
+      hasSession: !!s,
+      usage: this.usage,
+      limits: this.limits,
+      dailyBudget: this.config.budget_daily_usd,
+      monthlyBudget: this.config.budget_monthly_usd,
+    };
+  });
+
+  saveWidget(next: WidgetSettings) {
+    return this.updateConfig({ usage_widget: next });
+  }
+
+  /** Reads this computer's usage log only; it never sends a request to Claude. */
+  async refreshSessionUsage(cliSessionId: string) {
+    const totals = await ipc.usageSession(cliSessionId).catch(() => null);
+    if (!totals) return;
+    this.sessionLedger[cliSessionId] = totals;
+    this.sessionStale[cliSessionId] = false;
+  }
+
+  receive(p: SessionEventPayload) {
+    // Events can arrive before start_session resolves, so create state on first sight.
+    this.states[p.session_id] = reduce(this.states[p.session_id] ?? initialState(), p.event);
+    if (p.event.type !== "cli") return;
+    const e = p.event.event;
+    if (e.kind === "turn_result") {
+      const cid = this.states[p.session_id].cliSessionId;
+      if (cid) this.sessionStale[cid] = true;
+      void this.persist(p.session_id);
+      setTimeout(() => {
+        void this.refreshUsage();
+        if (cid) void this.refreshSessionUsage(cid);
+      }, 700);
+    } else if (e.kind === "rate_limit" && e.windows.length > 0) {
+      this.limits = { captured_at: Date.now(), status: e.status, using_overage: e.using_overage, windows: e.windows };
+    }
+  }
+
   async init() {
-    this.unlisten ??= await onSessionEvent((p) => {
-      // Events can arrive before start_session resolves, so create state on first sight.
-      this.states[p.session_id] = reduce(this.states[p.session_id] ?? initialState(), p.event);
-      if (p.event.type === "cli") {
-        const e = p.event.event;
-        if (e.kind === "turn_result") {
-          void this.persist(p.session_id);
-          setTimeout(() => void this.refreshUsage(), 700);
-        } else if (e.kind === "rate_limit" && e.windows.length > 0) {
-          this.limits = { captured_at: Date.now(), status: e.status, using_overage: e.using_overage, windows: e.windows };
-        }
-      }
-    });
+    this.unlisten ??= await onSessionEvent((p) => this.receive(p));
     try {
       this.config = { ...defaultConfig(), ...(await ipc.getConfig()) };
     } catch (e) {

@@ -8,6 +8,8 @@
   import Appearance from "./Appearance.svelte";
   import AutoRefresh from "./AutoRefresh.svelte";
   import BudgetFields from "./BudgetFields.svelte";
+  import WidgetCustomize from "./WidgetCustomize.svelte";
+  import { sanitizeWidget } from "../widget/config";
 
   let {
     config,
@@ -135,6 +137,11 @@
         <section>
           <h3>Plan limits</h3>
           <AutoRefresh enabled={config.auto_refresh_limits} minutes={config.refresh_limits_minutes} paused={limitsPaused} onchange={onautorefresh} />
+        </section>
+      {:else if category === "widget"}
+        <section>
+          <p>A small panel that shows tokens, estimated cost and plan limits while you work. It only reads what this app already has and never sends a request on its own.</p>
+          <WidgetCustomize settings={sanitizeWidget(config.usage_widget)} onchange={(next) => onsave({ usage_widget: next })} />
         </section>
       {:else if category === "data"}
         <section>

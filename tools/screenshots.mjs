@@ -42,6 +42,8 @@ for (const theme of themes) {
     await step("home", () => nav.getByRole("button", { name: "Home" }).click());
     await step("session", async () => {
       await nav.getByRole("button", { name: "New session" }).click();
+      // Home has a message box too, so wait for the session before typing.
+      await page.getByRole("heading", { name: "Where should Claude start?" }).waitFor();
       const box = page.getByLabel("Message", { exact: true });
       await box.fill("make an artifact");
       await box.press("Enter");
@@ -55,6 +57,50 @@ for (const theme of themes) {
     const category = (name) => page.getByRole("navigation", { name: "Settings categories" }).getByRole("button", { name }).click();
     await step("settings-appearance", () => category("Appearance"));
     await step("settings-usage", () => category("Usage and budgets"));
+    await step("settings-widget", () => category("Usage widget"));
+    const gear = () => page.getByRole("button", { name: "Customize the usage widget" }).click();
+    // A floating widget beside a waiting permission prompt, in its default spot and after moving it.
+    await step("widget-floating-default", () => page.getByLabel("Position").selectOption("floating"));
+    await step("widget-floating", async () => {
+      await nav.getByRole("button", { name: "New session" }).click();
+      const box = page.getByLabel("Message", { exact: true });
+      await box.fill("make an artifact");
+      await box.press("Enter");
+      await page.waitForTimeout(2500);
+    });
+    await step("widget-floating-moved", async () => {
+      const handle = page.getByRole("button", { name: /Move the usage widget/ });
+      const from = await handle.boundingBox();
+      await page.mouse.move(from.x + 10, from.y + 10);
+      await page.mouse.down();
+      await page.mouse.move(width - 150, 90, { steps: 8 });
+      await page.mouse.up();
+    });
+    // Dragged onto the bottom right, the widget must not stop the permission buttons or Send being clicked.
+    await step("widget-floating-over-prompt", async () => {
+      const handle = page.getByRole("button", { name: /Move the usage widget/ });
+      const from = await handle.boundingBox();
+      await page.mouse.move(from.x + 10, from.y + 10);
+      await page.mouse.down();
+      await page.mouse.move(width - 190, height - 150, { steps: 8 });
+      await page.mouse.up();
+      await page.waitForTimeout(300);
+      // While a reply is waiting, Send is the Stop button.
+      for (const name of ["Deny", /^Always allow /, "Allow", /^(Send|Stop \(Esc\))$/]) {
+        const button = page.getByRole("button", { name, exact: true }).last();
+        const clear = await button.evaluate((el) => {
+          const r = el.getBoundingClientRect();
+          const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+          return el.contains(top);
+        });
+        if (!clear) problems.push(`${theme} ${width}: ${name} is covered or off screen`);
+      }
+    });
+    await step("widget-dialog", gear);
+    await step("widget-toolbar", async () => {
+      await page.getByLabel("Position").selectOption("toolbar");
+      await page.keyboard.press("Escape");
+    });
     await page.close();
   }
 }

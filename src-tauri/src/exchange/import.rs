@@ -763,6 +763,18 @@ mod tests {
     }
 
     #[test]
+    fn restoring_a_backup_never_turns_the_tray_or_keep_running_on() {
+        let s = sanitize_settings(&json!({
+            "theme": "midnight",
+            "tray": {"enabled": true, "keep_running": true},
+            "keep_running": true,
+        }));
+        let o = s.as_object().unwrap();
+        assert!(!o.contains_key("tray") && !o.contains_key("keep_running"));
+        assert_eq!(o["theme"], "midnight");
+    }
+
+    #[test]
     fn settings_from_a_backup_can_never_weaken_safety() {
         let hostile = json!({
             "tier":"advanced","theme":"midnight","style":"terminal","default_model":"opus","auto_update_check":false,"budget_daily_usd":5.5,
