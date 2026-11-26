@@ -79,10 +79,6 @@
 
 <div class="page">
   <header>
-    <div>
-      <h1>Usage</h1>
-      <p class="sub">Tokens and estimated cost, recorded on this computer.</p>
-    </div>
     <div class="range" role="group" aria-label="Time range">
       {#each [7, 30, 90] as d (d)}
         <button class:on={days === d} aria-pressed={days === d} onclick={() => onrange(d)}>{d} days</button>
@@ -202,24 +198,23 @@
 </div>
 
 <style>
-  .page { max-width: 980px; margin: 0 auto; padding: 22px 24px 40px; width: 100%; display: flex; flex-direction: column; gap: 12px; }
-  header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
-  h1 { margin: 0; font-size: 24px; letter-spacing: -0.02em; }
+  .page { max-width: 980px; margin: 0 auto; padding: 8px 24px 40px; width: 100%; display: flex; flex-direction: column; gap: 12px; }
+  header { display: flex; justify-content: flex-end; }
   h2 { margin: 0 0 8px; font-size: 14px; color: var(--muted); font-weight: 600; }
   .sub { color: var(--muted); font-size: 12.5px; margin: 2px 0; }
   .note { margin: 0; padding: 10px 14px; border-left: 3px solid var(--accent); background: var(--surface); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; font-size: 13px; }
-  .warn { color: var(--gate); }
-  .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 14px 16px; }
+  .warn { color: var(--gate-text); }
+  .card { background: var(--card); border-radius: var(--radius-lg); padding: 14px 16px; }
   .periods { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
   .big { font-size: 24px; font-weight: 650; letter-spacing: -0.02em; }
   .rowline { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
   .win { margin-bottom: 10px; }
   .links, .foot { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
-  .range { display: inline-flex; background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); padding: 2px; }
+  .range { display: inline-flex; gap: 2px; background: var(--fill); border-radius: var(--radius); padding: 3px; }
   .range button { background: none; border: 0; border-radius: var(--radius-sm); padding: 3px 12px; color: var(--muted); }
-  .range button.on { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
-  button { background: var(--raised); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 6px 14px; color: var(--text); }
-  button.danger { color: var(--bad); }
+  .range button.on { background: var(--raised); color: var(--text); border: 1px solid var(--line); font-weight: 600; }
+  button { min-height: 30px; background: var(--fill); border: 1px solid transparent; border-radius: var(--capsule); padding: 4px 14px; color: var(--text); }
+  button.danger { color: var(--bad-text); }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   th, td { text-align: right; padding: 5px 8px; border-bottom: 1px solid var(--line); }
   th:first-child, td:first-child { text-align: left; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

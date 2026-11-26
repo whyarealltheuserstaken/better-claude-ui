@@ -12,7 +12,7 @@
 </div>
 
 <style>
-  .meter { height: 8px; background: var(--raised); border-radius: 999px; overflow: hidden; }
+  .meter { height: 6px; background: var(--track); border-radius: 999px; overflow: hidden; }
   .fill { height: 100%; background: var(--accent); border-radius: 999px; transition: width 0.3s; }
   .fill[data-level="warn"] { background: var(--gate); }
   .fill[data-level="over"] { background: var(--bad); }

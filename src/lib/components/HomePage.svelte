@@ -66,10 +66,6 @@
 
 <div class="home">
   <header>
-    <div>
-      <h1>Home</h1>
-      <p class="sub">Your usage and shortcuts at a glance.</p>
-    </div>
     <button onclick={() => onedit(!editing)}>{editing ? "Done" : "Customize"}</button>
   </header>
 
@@ -209,17 +205,16 @@
 </div>
 
 <style>
-  .home { max-width: 980px; margin: 0 auto; padding: 22px 24px 40px; width: 100%; }
-  header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 16px; }
-  h1 { margin: 0; font-size: 24px; letter-spacing: -0.02em; }
+  .home { max-width: 980px; margin: 0 auto; padding: 8px 24px 40px; width: 100%; }
+  header { display: flex; justify-content: flex-end; margin-bottom: 8px; }
   h2 { margin: 0 0 4px; font-size: 15px; }
   .sub { color: var(--muted); font-size: 12.5px; margin: 2px 0; }
-  .warn { color: var(--gate); }
+  .warn { color: var(--gate-text); }
   .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
   @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
-  button { background: var(--raised); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 6px 14px; color: var(--text); }
+  button { min-height: 30px; background: var(--fill); border: 1px solid transparent; border-radius: var(--capsule); padding: 4px 14px; color: var(--text); }
   button.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; font-weight: 600; }
-  button.link { background: none; border: 0; color: var(--accent); padding: 6px 0 0; }
+  button.link { background: none; border: 0; color: var(--accent-text); padding: 6px 0 0; }
   .actions { display: flex; gap: 10px; flex-wrap: wrap; }
   .win, .bar, .bud { margin-bottom: 10px; }
   .editor { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 14px 16px; margin-bottom: 14px; }

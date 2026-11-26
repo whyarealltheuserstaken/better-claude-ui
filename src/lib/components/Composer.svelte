@@ -20,7 +20,8 @@
     glyph?: string;
     commands?: string[];
     descriptions?: Record<string, string>;
-    onsend: (text: string, attachments: PendingAttachment[]) => void;
+    /** Resolve false when nothing was sent, and the draft comes back. */
+    onsend: (text: string, attachments: PendingAttachment[]) => unknown;
     oninterrupt: () => void;
   } = $props();
 
@@ -76,12 +77,17 @@
     }
   }
 
-  function submit() {
+  async function submit() {
     if (!canSend) return;
-    onsend(text.trim(), atts);
+    const draft = { text, atts };
+    const result = onsend(text.trim(), atts);
     text = "";
     atts = [];
     problem = null;
+    if ((await result) === false && !text && atts.length === 0) {
+      text = draft.text;
+      atts = draft.atts;
+    }
   }
 
   function pick(cmd: string) {

@@ -389,14 +389,15 @@ class AppStore {
     };
   }
 
-  async newSession(opts: StartOptions & { projectId?: string | null } = {}) {
+  /** The new session id, or null if nothing was started (cancelled or failed). */
+  async newSession(opts: StartOptions & { projectId?: string | null } = {}): Promise<string | null> {
     this.error = null;
     const mode = this.mode;
     const projectId = opts.projectId ?? null;
     const project = findProject(this.config.projects, projectId);
     try {
       const cwd = mode === "chat" ? null : (opts.cwd ?? project?.cwd ?? (await pickFolder()));
-      if (mode === "code" && !cwd) return;
+      if (mode === "code" && !cwd) return null;
       const so = this.startOptions(mode, { ...opts, cwd }, projectId);
       const id = await ipc.startSession(so);
       this.states[id] ??= initialState();
@@ -417,8 +418,10 @@ class AppStore {
       ];
       this.activeId = id;
       this.view = "session";
+      return id;
     } catch (e) {
       this.error = String(e);
+      return null;
     }
   }
 
@@ -530,11 +533,11 @@ class AppStore {
     if (m) this.mode = m.mode;
   }
 
-  async send(typed: string, attachments: PendingAttachment[] = []) {
+  async send(typed: string, attachments: PendingAttachment[] = []): Promise<boolean> {
     const id = this.activeId;
     const text = composeText(typed, attachments);
     const wire = toWire(attachments);
-    if (!id || (!text.trim() && wire.length === 0)) return;
+    if (!id || (!text.trim() && wire.length === 0)) return false;
     // Show what the user typed (not the inlined file bodies) plus attachment chips.
     this.states[id] = addUserMessage(
       this.states[id],
@@ -543,8 +546,10 @@ class AppStore {
     );
     try {
       await ipc.sendMessage(id, text, wire);
+      return true;
     } catch (e) {
       this.error = String(e);
+      return false;
     }
   }
 
