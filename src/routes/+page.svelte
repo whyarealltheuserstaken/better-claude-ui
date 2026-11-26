@@ -167,6 +167,15 @@
   $effect(() => {
     if (sessionKey) void app.refreshSessionUsage(sessionKey);
   });
+  const trayOn = $derived(app.tray.enabled);
+  const trayKeeps = $derived(app.tray.keep_running);
+  $effect(() => {
+    if (app.configLoaded) void app.applyTray(trayOn, trayKeeps);
+  });
+  // Reads the tray's status, so this runs again whenever it changes.
+  $effect(() => {
+    void app.syncTray();
+  });
   const waitingIds = $derived(new Set((app.active?.pending ?? []).map((p) => p.tool_use_id)));
   let transcript: ReturnType<typeof MessageList> | undefined = $state();
   function jump(id: string) {
@@ -328,6 +337,7 @@
           onimport={() => (app.showImport = true)}
           limitsPaused={app.limitsPaused}
           onautorefresh={(p) => app.setAutoRefresh(p)}
+          trayError={app.trayError}
           onsave={(patch) => app.updateConfig(patch)}
           onback={() => app.back()}
         />

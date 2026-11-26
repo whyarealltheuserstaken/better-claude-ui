@@ -469,6 +469,33 @@ pub async fn usage_summary(offset_minutes: i32, days: u32) -> Result<Summary, St
     .map_err(|e| e.to_string())
 }
 
+/// Create or remove the tray icon. Not async: tray work belongs on the main thread.
+#[tauri::command]
+pub fn tray_apply(app: tauri::AppHandle, enabled: bool, keep_running: bool) -> Result<(), String> {
+    crate::tray::apply(&app, enabled, keep_running)
+}
+
+#[tauri::command]
+pub fn tray_update(
+    app: tauri::AppHandle,
+    waiting: bool,
+    running: u32,
+    pending: u32,
+    title: Option<String>,
+    lines: Vec<String>,
+) -> Result<(), String> {
+    crate::tray::update(
+        &app,
+        crate::tray::Status {
+            waiting,
+            running,
+            pending,
+            title,
+            lines,
+        },
+    )
+}
+
 /// Totals for one conversation, by the CLI's session id.
 #[tauri::command]
 pub async fn usage_session(session_id: String) -> Result<usage::Totals, String> {

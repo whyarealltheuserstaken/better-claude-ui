@@ -71,6 +71,9 @@ export async function mockInvoke<T>(cmd: string, args?: Record<string, unknown>)
         daily, days,
       } as T;
     }
+    case "tray_apply":
+    case "tray_update":
+      return undefined as T;
     case "usage_session":
       return { cost_usd: 0.42, input: 1200, output: 5400, cache_read: 88000, cache_write: 6100, turns: 6 } as T;
     case "usage_limits":

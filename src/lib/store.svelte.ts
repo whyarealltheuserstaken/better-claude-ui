@@ -7,7 +7,8 @@ import { type ExportResult, type ImportResult, mergeProjects, settingsPatch } fr
 import { ipc, onSessionEvent, onUpdateProgress, pickFolder } from "./ipc";
 import { type UpdateProblem, type UpdateState, installBlockedReason, reduceUpdate, shouldAutoCheck } from "./updates";
 import { addUserMessage, initialState, reduce, removePending, replyTokens, restoreItems } from "./reducer";
-import { type WidgetSettings, sanitizeWidget } from "./widget/config";
+import { type WidgetSettings, sanitizeTray, sanitizeWidget } from "./widget/config";
+import { trayPayload } from "./widget/tray";
 import { type WidgetData, sessionSplit, widgetStatus } from "./widget/readings";
 import { type Caps, capsFor, normalizeTier } from "./tier";
 import { type PageView, type View, isPage } from "./settingsNav";
@@ -152,6 +153,43 @@ class AppStore {
     this.sessionStale[cliSessionId] = false;
   }
 
+  // ---- System tray / menu bar ----
+  tray = $derived(sanitizeTray(this.config.tray));
+  /** True only while the tray icon exists. */
+  trayReady = $state(false);
+  trayError = $state<string | null>(null);
+  /** Ticks once a minute, so a limit window that resets is noticed while nothing else changes. */
+  private trayClock = $state(0);
+  private traySent: string | null = null;
+  trayStatus = $derived.by(() => {
+    void this.trayClock;
+    return trayPayload(this.tray, this.widgetData, this.states, Date.now());
+  });
+
+  async applyTray(enabled: boolean, keepRunning: boolean) {
+    try {
+      await ipc.trayApply(enabled, keepRunning);
+      if (!enabled || !this.trayReady) this.traySent = null;
+      this.trayReady = enabled;
+      this.trayError = null;
+    } catch (e) {
+      this.traySent = null;
+      this.trayReady = false;
+      this.trayError = `${e}. Closing the window will quit.`;
+      this.error = this.trayError;
+    }
+  }
+
+  /** Sends the tray what it shows, when that has changed. */
+  async syncTray() {
+    if (!this.trayReady) return;
+    const status = this.trayStatus;
+    const key = JSON.stringify(status);
+    if (key === this.traySent) return;
+    this.traySent = key;
+    await ipc.trayUpdate(status).catch(() => (this.traySent = null));
+  }
+
   receive(p: SessionEventPayload) {
     // Events can arrive before start_session resolves, so create state on first sight.
     this.states[p.session_id] = reduce(this.states[p.session_id] ?? initialState(), p.event);
@@ -189,6 +227,7 @@ class AppStore {
     // Opt-in automatic refresh of the plan allowance: checked every minute, runs only when due.
     setTimeout(() => void this.autoRefreshTick(), 20_000);
     setInterval(() => void this.autoRefreshTick(), 60_000);
+    setInterval(() => (this.trayClock += 1), 60_000);
     await this.checkCli();
   }
 

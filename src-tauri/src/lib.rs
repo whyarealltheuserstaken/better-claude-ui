@@ -9,6 +9,7 @@ pub mod platform;
 pub mod presets;
 pub mod search;
 pub mod session;
+pub mod tray;
 pub mod updates;
 pub mod usage;
 
@@ -21,6 +22,8 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(commands::AppState::default())
+        .manage(tray::TrayState::default())
+        .on_window_event(tray::on_window_event)
         .invoke_handler(tauri::generate_handler![
             commands::cli_status,
             commands::start_session,
@@ -51,6 +54,8 @@ pub fn run() {
             commands::usage_session,
             commands::refresh_limits,
             commands::usage_clear,
+            commands::tray_apply,
+            commands::tray_update,
             commands::auth_status,
             commands::installer_preview,
             commands::run_setup_step,

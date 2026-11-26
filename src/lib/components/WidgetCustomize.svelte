@@ -1,10 +1,11 @@
-<script lang="ts">
+<script lang="ts" generics="S extends { items: WidgetItem[]; size: Size; position?: Position }">
   import Icon from "../ui/Icon.svelte";
   import Segmented from "../ui/Segmented.svelte";
-  import { type Display, type Position, type ReadingId, type Size, type WidgetItem, type WidgetSettings, allowedDisplays, moveItem } from "../widget/config";
+  import { type Display, type Position, type ReadingId, type Size, type WidgetItem, allowedDisplays, moveItem } from "../widget/config";
   import { READING_LABELS } from "../widget/readings";
 
-  let { settings, onchange }: { settings: WidgetSettings; onchange: (next: WidgetSettings) => void } = $props();
+  /** The tray's settings have no position; its controls carry a prefix so they stay apart from the widget's. */
+  let { settings, onchange, prefix = "", listLabel = "Readings" }: { settings: S; onchange: (next: S) => void; prefix?: string; listLabel?: string } = $props();
 
   const SIZES = [{ id: "compact", label: "Compact" }, { id: "regular", label: "Regular" }, { id: "large", label: "Large" }];
   const POSITIONS: { id: Position; label: string }[] = [
@@ -15,26 +16,31 @@
   ];
   const DISPLAY_NAMES: Record<Display, string> = { number: "Number", bar: "Bar", ring: "Ring", chart: "Chart" };
 
-  const save = (patch: Partial<WidgetSettings>) => onchange({ ...settings, ...patch });
+  const save = (patch: { items?: WidgetItem[]; size?: Size; position?: Position }) => onchange({ ...settings, ...patch });
   const setItem = (id: ReadingId, patch: Partial<WidgetItem>) => save({ items: settings.items.map((i) => (i.id === id ? { ...i, ...patch } : i)) });
 </script>
 
 <div class="customize">
   <div class="list">
-    <label class="split">Position
-      <select class="field" value={settings.position} onchange={(e) => save({ position: e.currentTarget.value as Position })}>
-        {#each POSITIONS as p (p.id)}<option value={p.id}>{p.label}</option>{/each}
-      </select>
-    </label>
-    <div class="split"><span>Size</span><Segmented label="Size" value={settings.size} options={SIZES} onpick={(v) => save({ size: v as Size })} /></div>
+    {#if settings.position !== undefined}
+      <label class="split">Position
+        <select class="field" value={settings.position} onchange={(e) => save({ position: e.currentTarget.value as Position })}>
+          {#each POSITIONS as p (p.id)}<option value={p.id}>{p.label}</option>{/each}
+        </select>
+      </label>
+    {/if}
+    <div class="split"><span>Size</span><Segmented label="{prefix}Size" value={settings.size} options={SIZES} onpick={(v) => save({ size: v as Size })} /></div>
   </div>
-  <p>In the toolbar, the first three chosen readings are shown. The right panel only appears beside a session, so elsewhere the widget moves to the toolbar.</p>
-  <ul class="list" aria-label="Readings">
+  {#if settings.position !== undefined}
+    <p>In the toolbar, the first three chosen readings are shown. The right panel only appears beside a session, so elsewhere the widget moves to the toolbar.</p>
+  {/if}
+  <ul class="list" aria-label={listLabel}>
     {#each settings.items as item, index (item.id)}
-      {@const name = READING_LABELS[item.id]}
+      {@const shownName = READING_LABELS[item.id]}
+      {@const name = prefix + shownName}
       {@const displays = allowedDisplays(item.id)}
       <li>
-        <label class="pick"><input type="checkbox" checked={item.on} onchange={(e) => setItem(item.id, { on: e.currentTarget.checked })} />{name}</label>
+        <label class="pick"><input type="checkbox" aria-label={prefix ? name : undefined} checked={item.on} onchange={(e) => setItem(item.id, { on: e.currentTarget.checked })} />{shownName}</label>
         {#if displays.length > 1}
           <select class="field" aria-label="Show {name} as" value={item.as} onchange={(e) => setItem(item.id, { as: e.currentTarget.value as Display })}>
             {#each displays as d (d)}<option value={d}>{DISPLAY_NAMES[d]}</option>{/each}

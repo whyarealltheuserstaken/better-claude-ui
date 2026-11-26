@@ -12,6 +12,16 @@ pub fn home() -> Option<PathBuf> {
     v.map(PathBuf::from)
 }
 
+/// Linux trays report no clicks and have no panel, so their menu carries the readings.
+pub fn tray_menu_lists_readings() -> bool {
+    cfg!(target_os = "linux")
+}
+
+/// Only the macOS menu bar gets text beside the icon.
+pub fn tray_shows_title() -> bool {
+    cfg!(target_os = "macos")
+}
+
 /// Per-user config directory for this app (not created).
 pub fn config_dir() -> PathBuf {
     // Debug builds only: lets automated tests use a throwaway profile instead of the real one.
