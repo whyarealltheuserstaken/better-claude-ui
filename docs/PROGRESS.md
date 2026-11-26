@@ -26,7 +26,8 @@ Legend: [x] done · [~] in progress · [ ] todo
 - [x] Updater: GitHub signing secrets added; real install-and-relaunch verified on Windows (0.1.0 to 0.1.1, relaunched)
 - [x] Updater: protected local key backup in place and machine-verified (`node tools/check-updater-key.mjs`)
 - [ ] Updater: an off-machine copy of the key (owner to choose where)
-- [ ] A few more features, defined by the owner and built by a different agent (list in `docs/GOALS.md`, currently empty)
+- [ ] UI and UX revamp (spec: `docs/superpowers/specs/2026-11-26-ui-revamp-design.md`)
+- [ ] A few more features, defined by the owner, after the revamp (list in `docs/GOALS.md`, currently empty)
 - [ ] Then tag and publish v0.1.0 (see the last item of M5 below)
 
 ## M0/M1 — Foundation & core Code mode (plan: `docs/superpowers/plans/2026-11-24-m0-m1-core-foundation.md`)

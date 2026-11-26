@@ -1,6 +1,6 @@
 # UI and UX revamp: design
 
-Date: 2026-11-26. Status: awaiting owner approval.
+Date: 2026-11-26. Status: approved by the owner (2026-11-26).
 
 This replaces the visual and layout direction of `2026-11-24-better-claude-ui-design.md` and `docs/HANDOFF.md` section 2. Their other decisions still apply. Items marked **[my call]** were decided while writing and have not been discussed with the owner.
 

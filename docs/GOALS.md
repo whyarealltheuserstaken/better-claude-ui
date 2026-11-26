@@ -7,7 +7,7 @@ The single place for "what must happen before the first release, and what comes 
 **Do not tag or publish v0.1.0 until every item below is done.** The app itself is otherwise feature-complete (see `docs/HANDOFF.md` section 3).
 
 1. **In-app updater, built first.** Status: **implemented and fully verified on Windows, including a real install-and-relaunch (0.1.0 to 0.1.1).** Only the owner's key backup and non-Windows paths remain. Design: `docs/DECISIONS/0003-in-app-updater.md`. Remaining owner actions are listed under "Updater status" below.
-2. **A few more features, defined by the owner and built by a different agent.** Status: **not started; list to be added by the owner.** Put them here as they are decided, one line each with acceptance criteria:
+2. **A few more features, defined by the owner, added after the UI and UX revamp** (`docs/superpowers/specs/2026-11-26-ui-revamp-design.md`, owner decision 2026-11-26: the revamp comes first, and development stays with Claude Code on one device). Status: **not started; list to be added by the owner.** Put them here as they are decided, one line each with acceptance criteria:
    - _(owner to fill in)_
    - _(owner to fill in)_
    - _(owner to fill in)_

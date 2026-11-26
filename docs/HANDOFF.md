@@ -215,7 +215,7 @@ The parser, broker and registry were written test-first with a RED run observed.
 
 ## 11. Next steps (in order)
 1. ~~Build the in-app updater~~ **Done and verified** (ADR 0003). Key safety: a protected read-only local backup exists and `node tools/check-updater-key.mjs` verifies it; still open is an off-machine copy of the key (owner's choice). See "Updater status" in `docs/GOALS.md`.
-1b. **Then the extra features the owner is defining** (listed in `docs/GOALS.md`; a different agent may be working on them, so check open PRs first).
+1b. **Now: the UI and UX revamp** (spec and plan dated 2026-11-26 in `docs/superpowers/`). **Then the extra features the owner is defining** (listed in `docs/GOALS.md`). Development stays with Claude Code on one device.
 1c. **Only after 1 and 1b: publish v0.1.0** (owner decision). Follow `docs/RELEASING.md`: push a `v0.1.0` tag, let the workflow build a DRAFT release, test the installers, publish. Builds are unsigned (SmartScreen / Gatekeeper warnings).
 2. Run the installer + browser sign-in wizard steps on a clean machine or VM (never exercised end to end), and try dictation with a real microphone.
 3. Try the macOS and Linux builds on real hardware (CI only builds and tests them); verify "Continue in terminal" there.
