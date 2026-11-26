@@ -496,6 +496,19 @@ pub fn tray_update(
     )
 }
 
+/// The tray panel asks the main window, and the main window calls these.
+#[tauri::command]
+pub fn tray_open(app: tauri::AppHandle) {
+    crate::tray::hide_panel(&app);
+    crate::tray::show_main(&app);
+}
+
+#[tauri::command]
+pub fn tray_quit(app: tauri::AppHandle) {
+    crate::tray::hide_panel(&app);
+    crate::tray::request_quit(&app);
+}
+
 /// Totals for one conversation, by the CLI's session id.
 #[tauri::command]
 pub async fn usage_session(session_id: String) -> Result<usage::Totals, String> {

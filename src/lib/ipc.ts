@@ -2,6 +2,7 @@ import type { ArchiveDoc, ArchiveEntry } from "./archive";
 import type { ExportResult, ImportOptions, ImportResult, Inspection } from "./exchange";
 import type { UpdateInfo } from "./updates";
 import type { TrayPayload } from "./widget/tray";
+import type { TrayAction, TrayView } from "./trayBridge";
 import type { AppConfig, AuthStatus, CliOutput, LimitsSnapshot, Totals, UsageSummary, Preset, ChatItem, CliStatus, FeatureInfo, SessionEventPayload, StartOptions } from "./types";
 
 export const inTauri = (): boolean => typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -20,6 +21,14 @@ export const ipc = {
   usageSession: (sessionId: string) => invoke<Totals>("usage_session", { sessionId }),
   trayApply: (enabled: boolean, keepRunning: boolean) => invoke<void>("tray_apply", { enabled, keepRunning }),
   trayUpdate: (status: TrayPayload) => invoke<void>("tray_update", { ...status }),
+  trayOpen: () => invoke<void>("tray_open"),
+  trayQuit: () => invoke<void>("tray_quit"),
+  /** Main window to the tray panel, if one is open. */
+  emitTray: async (view: TrayView): Promise<void> => {
+    if (!inTauri()) return;
+    const { emitTo } = await import("@tauri-apps/api/event");
+    await emitTo("tray", "tray-state", view);
+  },
   usageLimits: () => invoke<LimitsSnapshot | null>("usage_limits"),
   refreshLimits: () => invoke<LimitsSnapshot>("refresh_limits"),
   usageClear: () => invoke<void>("usage_clear"),
@@ -68,6 +77,35 @@ export async function onSessionEvent(handler: (p: SessionEventPayload) => void):
   if (!inTauri()) return (await import("./mock")).mockListen(handler);
   const { listen } = await import("@tauri-apps/api/event");
   return listen<SessionEventPayload>("session-event", (e) => handler(e.payload));
+}
+
+/** In the main window: what the tray panel asks for. Check it with parseTrayAction. */
+export async function onTrayAction(handler: (raw: unknown) => void): Promise<() => void> {
+  if (!inTauri()) return () => {};
+  const { listen } = await import("@tauri-apps/api/event");
+  return listen("tray-action", (e) => handler(e.payload));
+}
+
+/** In the tray panel. In a plain browser it shows sample numbers, for screenshots. */
+export async function onTrayView(handler: (raw: unknown) => void): Promise<() => void> {
+  if (!inTauri()) {
+    handler((await import("./mock")).mockTrayView());
+    return () => {};
+  }
+  const { listen } = await import("@tauri-apps/api/event");
+  return listen("tray-state", (e) => handler(e.payload));
+}
+
+export async function sendTrayAction(action: TrayAction): Promise<void> {
+  if (!inTauri()) return;
+  const { emit } = await import("@tauri-apps/api/event");
+  await emit("tray-action", action);
+}
+
+export async function hideThisWindow(): Promise<void> {
+  if (!inTauri()) return;
+  const { getCurrentWindow } = await import("@tauri-apps/api/window");
+  await getCurrentWindow().hide();
 }
 
 /** Make the standard title bar match the theme. Does nothing in a plain browser. */

@@ -1,15 +1,25 @@
-//! The optional system tray / menu bar icon. It only opens or quits the app:
-//! nothing can be approved from here.
+//! The optional system tray / menu bar icon and its small panel. They only show readings and open or
+//! quit the app: nothing can be approved from them.
 
 use std::sync::{Mutex, MutexGuard};
+use std::time::{Duration, Instant};
 
 use tauri::image::Image;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Manager, Window, WindowEvent, Wry};
+use tauri::{
+    AppHandle, Manager, PhysicalPosition, Rect, WebviewUrl, WebviewWindowBuilder, Window,
+    WindowEvent, Wry,
+};
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 
 use crate::platform;
+
+/// The panel window's label; `capabilities/tray.json` names it too.
+pub const PANEL: &str = "tray";
+const PANEL_W: f64 = 300.0;
+const PANEL_H: f64 = 440.0;
+const GAP: f64 = 8.0;
 
 const ID: &str = "main";
 const OPEN: &str = "tray-open";
@@ -44,6 +54,34 @@ pub fn menu_lines(lines: &[String]) -> Vec<String> {
         .collect()
 }
 
+/// The app's own commands (which include approving permission requests) are for the main window only.
+pub fn commands_allowed(window: &str) -> bool {
+    window == "main"
+}
+
+#[derive(Clone, Copy)]
+pub struct Area {
+    pub x: f64,
+    pub y: f64,
+    pub w: f64,
+    pub h: f64,
+}
+
+/// Centred on the icon: above it in the lower half of the screen, otherwise below; always on screen.
+pub fn panel_position(icon: Area, (w, h): (f64, f64), screen: Area) -> (f64, f64) {
+    let x = icon.x + icon.w / 2.0 - w / 2.0;
+    let y = if icon.y + icon.h / 2.0 > screen.y + screen.h / 2.0 {
+        icon.y - h - GAP
+    } else {
+        icon.y + icon.h + GAP
+    };
+    // min before max: a panel larger than the screen starts at its edge.
+    (
+        x.min(screen.x + screen.w - w).max(screen.x),
+        y.min(screen.y + screen.h - h).max(screen.y),
+    )
+}
+
 /// What the window last reported about all sessions.
 #[derive(Default, Clone, PartialEq)]
 pub struct Status {
@@ -60,6 +98,8 @@ struct Inner {
     menu: Option<Menu<Wry>>,
     keep_running: bool,
     status: Status,
+    /// When losing focus last hid the panel.
+    panel_blurred: Option<Instant>,
 }
 
 #[derive(Default)]
@@ -81,6 +121,7 @@ pub fn apply(app: &AppHandle, enabled: bool, keep_running: bool) -> Result<(), S
     } else if !enabled && existing {
         app.remove_tray_by_id(ID);
         lock(app).menu = None;
+        destroy_panel(app);
         // The icon was the way back to a hidden window.
         show_main(app);
     }
@@ -116,10 +157,18 @@ fn create(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
             if let TrayIconEvent::Click {
                 button: MouseButton::Left,
                 button_state: MouseButtonState::Up,
+                position,
+                rect,
                 ..
             } = event
             {
-                show_main(tray.app_handle());
+                let app = tray.app_handle().clone();
+                // Creating a window inside an event handler deadlocks WebView2.
+                std::thread::spawn(move || {
+                    if toggle_panel(&app, position, rect).is_err() {
+                        show_main(&app);
+                    }
+                });
             }
         })
         .build(app)?;
@@ -181,7 +230,72 @@ pub fn show_main(app: &AppHandle) {
     }
 }
 
-fn request_quit(app: &AppHandle) {
+fn toggle_panel(app: &AppHandle, click: PhysicalPosition<f64>, icon: Rect) -> tauri::Result<()> {
+    if let Some(panel) = app.get_webview_window(PANEL)
+        && panel.is_visible()?
+    {
+        return panel.hide();
+    }
+    // Pressing the icon already took focus from an open panel and hid it: that click means "close".
+    if lock(app)
+        .panel_blurred
+        .is_some_and(|at| at.elapsed() < Duration::from_millis(300))
+    {
+        return Ok(());
+    }
+    let panel = match app.get_webview_window(PANEL) {
+        Some(panel) => panel,
+        None => WebviewWindowBuilder::new(app, PANEL, WebviewUrl::App("tray".into()))
+            .title("BetterClaudeUI")
+            .inner_size(PANEL_W, PANEL_H)
+            .resizable(false)
+            .maximizable(false)
+            .minimizable(false)
+            .decorations(false)
+            .skip_taskbar(true)
+            .always_on_top(true)
+            .visible(false)
+            .build()?,
+    };
+    if let Some(monitor) = app.monitor_from_point(click.x, click.y)? {
+        let scale = monitor.scale_factor();
+        let at = icon.position.to_physical::<f64>(scale);
+        let size = icon.size.to_physical::<f64>(scale);
+        let work = monitor.work_area();
+        let (x, y) = panel_position(
+            Area {
+                x: at.x,
+                y: at.y,
+                w: size.width,
+                h: size.height,
+            },
+            (PANEL_W * scale, PANEL_H * scale),
+            Area {
+                x: f64::from(work.position.x),
+                y: f64::from(work.position.y),
+                w: f64::from(work.size.width),
+                h: f64::from(work.size.height),
+            },
+        );
+        panel.set_position(PhysicalPosition::new(x, y))?;
+    }
+    panel.show()?;
+    panel.set_focus()
+}
+
+pub fn hide_panel(app: &AppHandle) {
+    if let Some(panel) = app.get_webview_window(PANEL) {
+        let _ = panel.hide();
+    }
+}
+
+fn destroy_panel(app: &AppHandle) {
+    if let Some(panel) = app.get_webview_window(PANEL) {
+        let _ = panel.destroy();
+    }
+}
+
+pub fn request_quit(app: &AppHandle) {
     let (running, pending) = {
         let inner = lock(app);
         (inner.status.running, inner.status.pending)
@@ -208,19 +322,30 @@ fn request_quit(app: &AppHandle) {
 
 /// Closing the main window hides it only while the tray asks for that and exists.
 pub fn on_window_event(window: &Window, event: &WindowEvent) {
-    if window.label() != "main" {
-        return;
-    }
-    if let WindowEvent::CloseRequested { api, .. } = event {
-        let app = window.app_handle();
-        let hide = {
-            let inner = lock(app);
-            close_hides(inner.menu.is_some(), inner.keep_running)
-        };
-        if hide {
+    let app = window.app_handle();
+    match (window.label(), event) {
+        ("main", WindowEvent::CloseRequested { api, .. }) => {
+            let hide = {
+                let inner = lock(app);
+                close_hides(inner.menu.is_some(), inner.keep_running)
+            };
+            if hide {
+                api.prevent_close();
+                let _ = window.hide();
+            } else {
+                // A hidden panel is still a window: left alive, it would keep the app running unseen.
+                destroy_panel(app);
+            }
+        }
+        (PANEL, WindowEvent::Focused(false)) => {
+            lock(app).panel_blurred = Some(Instant::now());
+            let _ = window.hide();
+        }
+        (PANEL, WindowEvent::CloseRequested { api, .. }) => {
             api.prevent_close();
             let _ = window.hide();
         }
+        _ => {}
     }
 }
 
@@ -245,6 +370,72 @@ mod tests {
         assert!(quit_needs_confirm(1, 0));
         assert!(quit_needs_confirm(0, 1));
         assert!(quit_needs_confirm(2, 3));
+    }
+
+    #[test]
+    fn only_the_main_window_may_call_the_apps_commands() {
+        assert!(commands_allowed("main"));
+        assert!(!commands_allowed(PANEL));
+        assert!(!commands_allowed(""), "unknown windows get nothing");
+    }
+
+    const SCREEN: Area = Area {
+        x: 0.0,
+        y: 0.0,
+        w: 1920.0,
+        h: 1040.0,
+    };
+
+    #[test]
+    fn the_panel_opens_above_a_bottom_taskbar_and_below_a_top_menu_bar() {
+        let bottom = Area {
+            x: 1500.0,
+            y: 1050.0,
+            w: 24.0,
+            h: 24.0,
+        };
+        let (x, y) = panel_position(bottom, (300.0, 400.0), SCREEN);
+        assert_eq!(x, 1362.0);
+        assert_eq!(y, 640.0, "kept inside the work area, above the taskbar");
+
+        let top = Area {
+            x: 900.0,
+            y: 0.0,
+            w: 24.0,
+            h: 24.0,
+        };
+        assert_eq!(panel_position(top, (300.0, 400.0), SCREEN), (762.0, 32.0));
+    }
+
+    #[test]
+    fn the_panel_never_leaves_the_screen() {
+        let corner = Area {
+            x: 1910.0,
+            y: 1050.0,
+            w: 24.0,
+            h: 24.0,
+        };
+        assert_eq!(panel_position(corner, (300.0, 400.0), SCREEN).0, 1620.0);
+        let second = Area {
+            x: -1920.0,
+            y: 0.0,
+            w: 1920.0,
+            h: 1040.0,
+        };
+        let far_left = Area {
+            x: -1915.0,
+            y: 1050.0,
+            w: 24.0,
+            h: 24.0,
+        };
+        assert_eq!(panel_position(far_left, (300.0, 400.0), second).0, -1920.0);
+        let tiny = Area {
+            x: 0.0,
+            y: 0.0,
+            w: 200.0,
+            h: 200.0,
+        };
+        assert_eq!(panel_position(corner, (300.0, 400.0), tiny), (0.0, 0.0));
     }
 
     #[test]

@@ -54,7 +54,14 @@
 </div>
 
 <style>
-  .customize { display: flex; flex-direction: column; gap: 10px; }
+  .customize { display: flex; flex-direction: column; gap: 10px; container-type: inline-size; }
+  /* The tray panel is 300px wide: stack the size choice and tighten the reading rows. */
+  @container (max-width: 340px) {
+    .list > .split { flex-direction: column; align-items: stretch; gap: 6px; }
+    .list > li { gap: 2px; padding-inline: 8px; }
+    li .pick { gap: 7px; font-size: 12.5px; }
+    li select { width: 80px; flex: none; padding-inline: 6px; font-size: 12.5px; }
+  }
   .split { justify-content: space-between; }
   p { margin: 0; color: var(--muted); font-size: 12.5px; }
   ul { list-style: none; margin: 0; padding: 0; }

@@ -41,7 +41,7 @@
   import MessageList from "$lib/components/MessageList.svelte";
   import PermissionPrompt from "$lib/components/PermissionPrompt.svelte";
   import SetupWizard from "$lib/components/SetupWizard.svelte";
-  import { applyAppearance, resolveStyle, resolveTheme } from "$lib/theme";
+  import { appearanceVars, applyAppearance, resolveStyle, resolveTheme } from "$lib/theme";
   import Sidebar from "$lib/components/Sidebar.svelte";
   import { app } from "$lib/store.svelte";
 
@@ -171,6 +171,11 @@
   const trayKeeps = $derived(app.tray.keep_running);
   $effect(() => {
     if (app.configLoaded) void app.applyTray(trayOn, trayKeeps);
+  });
+  $effect(() => {
+    const theme = resolveTheme(app.config.theme, app.config.custom_themes, systemDark);
+    const style = resolveStyle(app.config.style, app.config.custom_styles);
+    void app.syncPanel({ ...appearanceVars(theme, style), "color-scheme": theme.scheme });
   });
   // Reads the tray's status, so this runs again whenever it changes.
   $effect(() => {

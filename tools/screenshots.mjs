@@ -104,5 +104,16 @@ for (const theme of themes) {
     await page.close();
   }
 }
+// The tray panel at its window size, with sample numbers and the default colours.
+{
+  const page = await browser.newPage({ viewport: { width: 300, height: 440 } });
+  page.on("pageerror", (e) => problems.push(`tray: ${e.message}`));
+  await page.goto(new URL("tray", url).href);
+  await page.getByRole("button", { name: "Quit" }).waitFor();
+  await page.screenshot({ path: join(out, "tray-panel.png") });
+  await page.getByRole("button", { name: "Customize the usage widget" }).click();
+  await page.screenshot({ path: join(out, "tray-panel-customize.png") });
+  await page.close();
+}
 await browser.close();
 console.log(problems.length ? problems.join("\n") : "no problems");

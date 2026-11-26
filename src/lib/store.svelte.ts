@@ -4,11 +4,12 @@ import { allProjects, findProject } from "./projects";
 import { type ArchiveDoc, type ArchiveEntry, continueContext } from "./archive";
 import { MAX_FAILURES, shouldAutoRefresh } from "./limits";
 import { type ExportResult, type ImportResult, mergeProjects, settingsPatch } from "./exchange";
-import { ipc, onSessionEvent, onUpdateProgress, pickFolder } from "./ipc";
+import { ipc, onSessionEvent, onTrayAction, onUpdateProgress, pickFolder } from "./ipc";
 import { type UpdateProblem, type UpdateState, installBlockedReason, reduceUpdate, shouldAutoCheck } from "./updates";
 import { addUserMessage, initialState, reduce, removePending, replyTokens, restoreItems } from "./reducer";
 import { type WidgetSettings, sanitizeTray, sanitizeWidget } from "./widget/config";
 import { trayPayload } from "./widget/tray";
+import { type TrayAction, type TrayView, parseTrayAction } from "./trayBridge";
 import { type WidgetData, sessionSplit, widgetStatus } from "./widget/readings";
 import { type Caps, capsFor, normalizeTier } from "./tier";
 import { type PageView, type View, isPage } from "./settingsNav";
@@ -169,7 +170,7 @@ class AppStore {
   async applyTray(enabled: boolean, keepRunning: boolean) {
     try {
       await ipc.trayApply(enabled, keepRunning);
-      if (!enabled || !this.trayReady) this.traySent = null;
+      if (!enabled || !this.trayReady) this.traySent = this.panelSent = null;
       this.trayReady = enabled;
       this.trayError = null;
     } catch (e) {
@@ -188,6 +189,34 @@ class AppStore {
     if (key === this.traySent) return;
     this.traySent = key;
     await ipc.trayUpdate(status).catch(() => (this.traySent = null));
+  }
+
+  private panelSent: string | null = null;
+  private panelVars: Record<string, string> = {};
+
+  /** Sends the tray panel its view, when that has changed. */
+  async syncPanel(vars: Record<string, string> = this.panelVars) {
+    this.panelVars = vars;
+    if (!this.trayReady) return;
+    const view = $state.snapshot({ data: this.widgetData, settings: this.tray, vars, status: this.widgetState }) as TrayView;
+    const key = JSON.stringify(view);
+    if (key === this.panelSent) return;
+    this.panelSent = key;
+    await ipc.emitTray(view).catch(() => (this.panelSent = null));
+  }
+
+  async handleTrayAction(action: TrayAction) {
+    if (action.type === "ready") {
+      this.panelSent = null;
+      await this.syncPanel();
+    } else if (action.type === "settings") {
+      // Only what the panel can edit: it never switches the tray or Keep running.
+      await this.updateConfig({ tray: { ...this.tray, items: action.value.items, size: action.value.size } });
+    } else if (action.type === "open") {
+      await ipc.trayOpen().catch((e) => (this.error = String(e)));
+    } else {
+      await ipc.trayQuit().catch((e) => (this.error = String(e)));
+    }
   }
 
   receive(p: SessionEventPayload) {
@@ -210,6 +239,10 @@ class AppStore {
 
   async init() {
     this.unlisten ??= await onSessionEvent((p) => this.receive(p));
+    await onTrayAction((raw) => {
+      const action = parseTrayAction(raw);
+      if (action) void this.handleTrayAction(action);
+    });
     try {
       this.config = { ...defaultConfig(), ...(await ipc.getConfig()) };
     } catch (e) {
