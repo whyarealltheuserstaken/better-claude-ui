@@ -1,6 +1,8 @@
 /** Themes (colours) and styles (typography, shape, layout). Both are plain data so users can edit,
  *  export and import them. `appearanceVars` turns a pair into CSS custom properties. */
 
+import { contrast, ensureContrast, hueDistance, mix, rotateHue } from "./color";
+
 export interface ThemeColors {
   bg: string;
   surface: string;
@@ -71,8 +73,8 @@ export const BUILTIN_THEMES: Theme[] = [
   { id: "graphite", name: "Graphite", scheme: "dark", colors: c("#0f121a", "#161a24", "#202636", "#272e40", "#e8eaf0", "#8e97a8", "#8f9dff", "#0d1020", "#f2b84b", "#1d1503", "#6fcf97", "#ef7b7b") },
   { id: "paper", name: "Paper", scheme: "light", colors: c("#f1f3f8", "#fbfcfe", "#e6e9f1", "#d5d9e4", "#181d2c", "#5d6679", "#4555c8", "#ffffff", "#b97a08", "#ffffff", "#1f8a4c", "#c23d3d") },
   { id: "midnight", name: "Midnight", scheme: "dark", colors: c("#070a12", "#0c1220", "#142038", "#1c2b4a", "#dbe6ff", "#7f93bd", "#5cc8ff", "#001018", "#ffb454", "#1a1000", "#5be0a0", "#ff7a8a") },
-  { id: "solar-dark", name: "Solarized Dark", scheme: "dark", colors: c("#002b36", "#073642", "#0b4352", "#17596a", "#93a1a1", "#657b83", "#268bd2", "#fdf6e3", "#b58900", "#002b36", "#859900", "#dc322f") },
-  { id: "solar-light", name: "Solarized Light", scheme: "light", colors: c("#fdf6e3", "#fffaf0", "#eee8d5", "#d9d2bd", "#586e75", "#93a1a1", "#268bd2", "#fdf6e3", "#b58900", "#fdf6e3", "#859900", "#dc322f") },
+  { id: "solar-dark", name: "Solarized Dark", scheme: "dark", colors: c("#002b36", "#073642", "#0b4352", "#17596a", "#b3bfbf", "#93a1a1", "#268bd2", "#fdf6e3", "#b58900", "#002b36", "#859900", "#dc322f") },
+  { id: "solar-light", name: "Solarized Light", scheme: "light", colors: c("#fdf6e3", "#fffaf0", "#eee8d5", "#d9d2bd", "#4a5e65", "#56696f", "#268bd2", "#fdf6e3", "#b58900", "#fdf6e3", "#859900", "#dc322f") },
   { id: "terminal-green", name: "Terminal Green", scheme: "dark", colors: c("#050805", "#0a100a", "#101a10", "#1c3a1c", "#b8f5b8", "#5f8f5f", "#3dff6e", "#031003", "#ffb000", "#1a1000", "#3dff6e", "#ff5555") },
   { id: "terminal-amber", name: "Terminal Amber", scheme: "dark", colors: c("#0b0700", "#120c02", "#1b1204", "#3a2a08", "#ffcf6e", "#9a7a35", "#ffb000", "#1a1000", "#ff6b3d", "#1a0600", "#c8d94a", "#ff6b6b") },
   { id: "high-contrast", name: "High contrast", scheme: "dark", colors: c("#000000", "#0a0a0a", "#1a1a1a", "#ffffff", "#ffffff", "#c8c8c8", "#ffe066", "#000000", "#ff9f1a", "#000000", "#4dff88", "#ff6666") },
@@ -157,6 +159,79 @@ export function resolveStyle(id: string, custom: unknown[]): StyleDef {
   return list.find((s) => s.id === id) ?? BUILTIN_STYLES[0];
 }
 
+/** Everything the UI needs beyond the 12 saved colours. The saved colours are never changed. */
+export interface Derived {
+  /** No glass and no glow (high contrast). */
+  solid: boolean;
+  /** The everyday glow is grey so the waiting glow stands out. */
+  neutralGlow: boolean;
+  text: string;
+  muted: string;
+  accentInk: string;
+  gateInk: string;
+  accentText: string;
+  gateText: string;
+  okText: string;
+  badText: string;
+  sheet: string;
+  card: string;
+  glassBase: string;
+  glassAlpha: number;
+  /** Every surface text can sit on, including glass over each glow colour. */
+  backgrounds: string[];
+  glow: [string, string, string];
+  wait: [string, string];
+}
+
+/** Hues closer than this to the waiting colour are too easy to confuse with it. */
+const NEAR_WAITING = 40;
+
+export function deriveColors(theme: Theme): Derived {
+  const k = theme.colors;
+  // A theme whose borders are as strong as text is a high-contrast theme.
+  const solid = contrast(k.line, k.bg) >= 7;
+  const neutralGlow = solid || hueDistance(k.accent, k.gate) < NEAR_WAITING;
+  const side = (deg: number) => {
+    const c = rotateHue(k.accent, deg);
+    return hueDistance(c, k.gate) < NEAR_WAITING ? k.accent : c;
+  };
+  const glow: [string, string, string] = solid
+    ? [k.bg, k.bg, k.bg]
+    : neutralGlow
+      ? [mix(k.bg, k.muted, 0.2), mix(k.bg, k.muted, 0.14), mix(k.bg, k.muted, 0.17)]
+      : [mix(k.bg, k.accent, 0.4), mix(k.bg, side(-45), 0.3), mix(k.bg, side(45), 0.3)];
+  const wait: [string, string] = solid ? [k.bg, k.bg] : [mix(k.bg, k.gate, 0.5), mix(k.bg, k.gate, 0.34)];
+  const glassAlpha = solid ? 1 : 0.76;
+  const glass = [...glow, ...wait].map((under) => mix(under, k.surface, glassAlpha));
+  const backgrounds = [...new Set([k.bg, k.surface, k.raised, ...glass])];
+  const readable = (c: string) => ensureContrast(c, backgrounds);
+  return {
+    solid,
+    neutralGlow,
+    text: readable(k.text),
+    muted: readable(k.muted),
+    accentInk: ensureContrast(k.accentInk, [k.accent]),
+    gateInk: ensureContrast(k.gateInk, [k.gate]),
+    accentText: readable(k.accent),
+    gateText: readable(k.gate),
+    okText: readable(k.ok),
+    badText: readable(k.bad),
+    sheet: k.bg,
+    card: k.surface,
+    glassBase: k.surface,
+    glassAlpha,
+    backgrounds,
+    glow,
+    wait,
+  };
+}
+
+/** Which saved colours are shown differently so they stay readable. */
+export function adjustedKeys(theme: Theme): (keyof ThemeColors)[] {
+  const d = deriveColors(theme);
+  return (["text", "muted", "accentInk", "gateInk"] as const).filter((key) => d[key] !== theme.colors[key]);
+}
+
 const FONTS: Record<FontKind, string> = {
   system: '"Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", sans-serif',
   mono: '"Cascadia Code", "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace',
@@ -166,11 +241,17 @@ const FONTS: Record<FontKind, string> = {
 /** CSS custom properties for a theme + style. */
 export function appearanceVars(theme: Theme, style: StyleDef): Record<string, string> {
   const k = theme.colors;
+  const d = deriveColors(theme);
   const ui = style.fontFamily ? `${style.fontFamily}, ${FONTS[style.font]}` : FONTS[style.font];
   return {
     "--bg": k.bg, "--surface": k.surface, "--raised": k.raised, "--line": k.line,
-    "--text": k.text, "--muted": k.muted, "--accent": k.accent, "--accent-ink": k.accentInk,
-    "--gate": k.gate, "--gate-ink": k.gateInk, "--ok": k.ok, "--bad": k.bad,
+    "--text": d.text, "--muted": d.muted, "--accent": k.accent, "--accent-ink": d.accentInk,
+    "--gate": k.gate, "--gate-ink": d.gateInk, "--ok": k.ok, "--bad": k.bad,
+    "--accent-text": d.accentText, "--gate-text": d.gateText, "--ok-text": d.okText, "--bad-text": d.badText,
+    "--sheet": d.sheet, "--card": d.card,
+    "--glass": `color-mix(in srgb, ${d.glassBase} ${Math.round(d.glassAlpha * 100)}%, transparent)`,
+    "--glow-a": d.glow[0], "--glow-b": d.glow[1], "--glow-c": d.glow[2],
+    "--wait-a": d.wait[0], "--wait-b": d.wait[1],
     "--ui": ui,
     "--font-size": `${style.fontSize}px`,
     "--radius": `${style.radius}px`,
@@ -186,6 +267,8 @@ export function appearanceVars(theme: Theme, style: StyleDef): Record<string, st
 export function applyAppearance(root: HTMLElement, theme: Theme, style: StyleDef): void {
   for (const [k, v] of Object.entries(appearanceVars(theme, style))) root.style.setProperty(k, v);
   root.style.colorScheme = theme.scheme;
+  root.dataset.solid = String(deriveColors(theme).solid);
+  root.dataset.scheme = theme.scheme;
   root.dataset.user = style.userStyle;
   root.dataset.tool = style.toolStyle;
 }

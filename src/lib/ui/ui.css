@@ -1,0 +1,70 @@
+/* Shared building blocks. Colours come from the variables that theme.ts sets. */
+:root {
+  --sheet: var(--bg);
+  --card: var(--surface);
+  --glass: color-mix(in srgb, var(--surface) 76%, transparent);
+  --accent-text: var(--accent);
+  --gate-text: var(--gate);
+  --ok-text: var(--ok);
+  --bad-text: var(--bad);
+  --fill: color-mix(in srgb, var(--text) 7%, transparent);
+  --track: color-mix(in srgb, var(--text) 16%, transparent);
+  --sel: color-mix(in srgb, var(--text) 12%, transparent);
+  --glow-a: #2f3877;
+  --glow-b: #18475a;
+  --glow-c: #3a2a63;
+  --wait-a: #82663a;
+  --wait-b: #5c4c35;
+  --float-radius: calc(var(--radius) * 1.9);
+  --capsule: calc(var(--radius) * 100);
+}
+
+.glass {
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(30px) saturate(150%);
+  backdrop-filter: blur(30px) saturate(150%);
+  border: 1px solid var(--line);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 9%, transparent), 0 12px 34px rgb(0 0 0 / 0.18);
+}
+:root[data-solid="true"] .glass { background: var(--surface); -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: none; }
+
+.btn, .pill {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  min-height: 30px; padding: 4px 14px; border: 1px solid transparent; border-radius: var(--capsule);
+  background: var(--fill); color: var(--text); font-weight: 550; white-space: nowrap; max-width: 100%;
+}
+.pill { min-height: 28px; padding: 3px 11px; font-size: max(12.5px, 0.88em); }
+.btn:hover:not(:disabled), .pill:hover:not(:disabled) { background: var(--sel); }
+.btn:disabled, .pill:disabled { opacity: 0.45; cursor: default; }
+.btn-primary { background: var(--accent); color: var(--accent-ink); font-weight: 650; }
+.btn-primary:hover:not(:disabled) { background: var(--accent); filter: brightness(1.08); }
+.btn-gate { background: var(--gate); color: var(--gate-ink); font-weight: 650; }
+.btn-gate:hover:not(:disabled) { background: var(--gate); filter: brightness(1.06); }
+.btn-icon {
+  display: inline-grid; place-items: center; flex: none; width: 30px; height: 30px; padding: 0;
+  background: none; border: 1px solid transparent; border-radius: var(--radius-sm); color: var(--muted);
+}
+.btn-icon:hover:not(:disabled) { background: var(--fill); color: var(--text); }
+.btn-icon:disabled { opacity: 0.4; cursor: default; }
+
+.list { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-lg); }
+.list > * { display: flex; align-items: center; gap: 12px; padding: 10px 14px; }
+.list > * + * { border-top: 1px solid var(--line); }
+
+.field {
+  min-height: 32px; padding: 5px 11px; background: var(--card); color: var(--text);
+  border: 1px solid var(--line); border-radius: var(--radius-sm); font: inherit;
+}
+
+.badge { min-width: 18px; padding: 0 6px; border-radius: 9px; background: var(--gate); color: var(--gate-ink); font-size: 11.5px; font-weight: 700; text-align: center; }
+
+@media (prefers-reduced-transparency: reduce) {
+  .glass { background: var(--surface); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+@media (prefers-contrast: more) {
+  :root { --line: var(--muted) !important; }
+  .glass { background: var(--surface); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+@media (forced-colors: active) {
+  .btn, .pill, .btn-primary, .btn-gate, .list, .glass { border-color: ButtonText; }
+}
