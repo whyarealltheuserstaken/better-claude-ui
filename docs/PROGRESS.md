@@ -4,8 +4,8 @@ Legend: [x] done · [~] in progress · [ ] todo
 
 ## v0.1.0 release gate (owner decision, details in `docs/GOALS.md`)
 - [x] **In-app updater implemented and verified in the real app** (ADR 0003, `node tools/e2e.mjs updater`): signed updates, daily quiet check + manual check, release notes, progress, skip version; tampered / wrong-key / replayed installers rejected
-- [ ] Updater: owner adds the 2 GitHub secrets and backs up the private key (see `docs/GOALS.md`)
-- [ ] Updater: real install-and-relaunch test (needs owner approval and two real versions)
+- [x] Updater: GitHub signing secrets added; real install-and-relaunch verified on Windows (0.1.0 to 0.1.1, relaunched)
+- [ ] Updater: **owner backs up the private key** (`%USERPROFILE%\.bcu-updater\updater.key` + `key.password`); losing it means installed copies can never update
 - [ ] A few more features, defined by the owner and built by a different agent (list in `docs/GOALS.md`, currently empty)
 - [ ] Then tag and publish v0.1.0 (see the last item of M5 below)
 

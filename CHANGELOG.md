@@ -1,7 +1,7 @@
 # Changelog
 
 ## Unreleased
-- **In-app updater**: signed updates only (tampered, wrongly signed and replayed installers are rejected), quiet daily check, manual check, release notes, progress, skip a version, never installs without a click or mid-reply. Verified against a local signed test server; real install-and-relaunch pending.
+- **In-app updater**: signed updates only (tampered, wrongly signed and replayed installers are rejected), quiet daily check, manual check, release notes, progress, skip a version, never installs without a click or mid-reply. Verified against a local signed test server and with a real install-and-relaunch on Windows (0.1.0 to 0.1.1).
 - Still planned before 0.1.0 ships: a few owner-chosen features (see `docs/GOALS.md`).
 
 ## 0.1.0 (candidate, not released)
