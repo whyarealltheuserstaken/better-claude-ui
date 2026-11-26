@@ -4,14 +4,14 @@ import { ICONS } from "./ui/icons";
 
 describe("settings categories", () => {
   test("lists the categories in order, each with a known icon", () => {
-    expect(CATEGORIES.map((c) => c.id)).toEqual(["general", "appearance", "usage", "data", "updates"]);
-    expect(CATEGORIES.map((c) => c.label)).toEqual(["General", "Appearance", "Usage and budgets", "Your data", "Updates"]);
+    expect(CATEGORIES.map((c) => c.id)).toEqual(["general", "appearance", "usage", "widget", "data", "updates"]);
+    expect(CATEGORIES.map((c) => c.label)).toEqual(["General", "Appearance", "Usage and budgets", "Usage widget", "Your data", "Updates"]);
     for (const c of CATEGORIES) expect(ICONS[c.icon], c.id).toBeDefined();
   });
 
   test("a saved category is kept; anything else shows General", () => {
     expect(cleanCategory("updates")).toBe("updates");
-    for (const bad of ["", "nope", "widget", null, undefined, 3, {}]) expect(cleanCategory(bad), String(bad)).toBe("general");
+    for (const bad of ["", "nope", "tray", null, undefined, 3, {}]) expect(cleanCategory(bad), String(bad)).toBe("general");
   });
 });
 

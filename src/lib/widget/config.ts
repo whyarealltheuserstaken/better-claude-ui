@@ -26,6 +26,10 @@ export interface TraySettings {
   size: Size;
 }
 
+/** The floating widget starts at the top right: clamping brings this back to the window's edge. */
+const FAR_RIGHT = 100_000;
+const BELOW_TOOLBAR = 72;
+
 const SIZES: readonly Size[] = ["compact", "regular", "large"];
 const POSITIONS: readonly Position[] = ["panel", "floating", "toolbar", "hidden"];
 const METERED: Display[] = ["bar", "ring", "number"];
@@ -65,8 +69,8 @@ export function sanitizeWidget(raw: unknown): WidgetSettings {
     items: cleanItems(r.items, WIDGET_DEFAULT),
     size: oneOf(r.size, SIZES, "regular"),
     position: oneOf(r.position, POSITIONS, "panel"),
-    x: finite(r.x, 24),
-    y: finite(r.y, 80),
+    x: finite(r.x, FAR_RIGHT),
+    y: finite(r.y, BELOW_TOOLBAR),
   };
 }
 

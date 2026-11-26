@@ -46,6 +46,12 @@ describe("widget settings", () => {
     expect(sanitizeWidget({ size: "compact", position: "floating", x: 40, y: 90 })).toMatchObject({ size: "compact", position: "floating", x: 40, y: 90 });
   });
 
+  test("a new floating widget starts at the top right, clear of the sidebar and toolbar", () => {
+    const d = sanitizeWidget(null);
+    expect(clampPoint(d.x, d.y, 250, 300, 1100, 760)).toEqual({ x: 850, y: 72 });
+    expect(clampPoint(d.x, d.y, 250, 300, 3840, 2100)).toEqual({ x: 3590, y: 72 });
+  });
+
   test("keep running needs the tray to be on, and only a real true counts", () => {
     expect(sanitizeTray({ enabled: false, keep_running: true }).keep_running).toBe(false);
     expect(sanitizeTray({ enabled: "yes", keep_running: true })).toMatchObject({ enabled: false, keep_running: false });

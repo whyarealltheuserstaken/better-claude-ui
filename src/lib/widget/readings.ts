@@ -1,8 +1,24 @@
 /** What each widget reading says. Pure; it never invents a value it was not given. */
 import { budgetState, fmtReset, fmtTokens, fmtUsd } from "../format";
 import { asOfLabel, windowHasReset } from "../limits";
-import type { LimitsSnapshot, TokenSplit, Totals, UsageSummary } from "../types";
+import type { LimitsSnapshot, SessionState, TokenSplit, Totals, UsageSummary } from "../types";
 import type { ReadingId } from "./config";
+
+export type WidgetStatus = "working" | "waiting" | "idle";
+
+/** Across every session: waiting must not hide behind another session's work. */
+export function widgetStatus(states: Record<string, SessionState>): WidgetStatus {
+  const all = Object.values(states);
+  if (all.some((s) => s.pending.length > 0)) return "waiting";
+  return all.some((s) => s.status === "running") ? "working" : "idle";
+}
+
+/** The usage log's total, plus the current reply while the log does not hold it yet. */
+export function sessionSplit(ledger: Totals | null, reply: TokenSplit | null, addReply: boolean): TokenSplit | null {
+  const sum = (key: keyof TokenSplit) => num(ledger?.[key]) + (addReply ? num(reply?.[key]) : 0);
+  const t = { input: sum("input"), output: sum("output"), cache_read: sum("cache_read"), cache_write: sum("cache_write") };
+  return t.input + t.output + t.cache_read + t.cache_write > 0 ? t : null;
+}
 
 export interface WidgetData {
   reply: TokenSplit | null;
@@ -24,7 +40,7 @@ export interface Reading {
   warn: boolean;
 }
 
-const LABELS: Record<ReadingId, string> = {
+export const READING_LABELS: Record<ReadingId, string> = {
   reply: "This reply",
   session_tokens: "Session tokens",
   session_cost: "Session cost",
@@ -38,7 +54,7 @@ const LABELS: Record<ReadingId, string> = {
 
 const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v > 0 ? v : 0);
 
-const plain = (id: ReadingId, value: string, sub = ""): Reading => ({ label: LABELS[id], value, percent: null, sub, warn: false });
+const plain = (id: ReadingId, value: string, sub = ""): Reading => ({ label: READING_LABELS[id],value, percent: null, sub, warn: false });
 
 /** "Tokens" counts cache too, as Home and Usage do; the second line shows the split. */
 function tokens(id: ReadingId, t: TokenSplit | Totals): Reading {
@@ -55,7 +71,7 @@ function limit(id: ReadingId, name: string, limits: LimitsSnapshot | null, now: 
   const percent = Math.round(num(w.utilization) * 100);
   const resets = w.resets_at === null ? "" : `Resets ${fmtReset(w.resets_at, now)}, `;
   const sub = resets ? resets + asOf : asOf.charAt(0).toUpperCase() + asOf.slice(1);
-  return { label: LABELS[id], value: `${percent}%`, percent, sub, warn: w.utilization >= 0.8 };
+  return { label: READING_LABELS[id], value: `${percent}%`, percent, sub, warn: w.utilization >= 0.8 };
 }
 
 function spend(id: ReadingId, totals: Totals | undefined, budget: number | null): Reading {
@@ -64,7 +80,7 @@ function spend(id: ReadingId, totals: Totals | undefined, budget: number | null)
   const state = budgetState(spent, num(budget) || null);
   if (state.level === "none") return plain(id, fmtUsd(spent), "No budget set");
   return {
-    label: LABELS[id],
+    label: READING_LABELS[id],
     value: fmtUsd(spent),
     percent: Math.min(999, Math.round(state.fraction * 100)),
     sub: `of ${fmtUsd(num(budget))}`,

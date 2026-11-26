@@ -32,6 +32,11 @@
   import type { Mode } from "$lib/types";
   import SettingsPage from "$lib/components/SettingsPage.svelte";
   import { CATEGORIES, cleanCategory, escapeGoesBack, pageAllowed } from "$lib/settingsNav";
+  import UsageWidget from "$lib/components/UsageWidget.svelte";
+  import WidgetCustomize from "$lib/components/WidgetCustomize.svelte";
+  import Dialog from "$lib/ui/Dialog.svelte";
+  import { effectivePosition } from "$lib/widget/config";
+  import { widgetPaletteItems } from "$lib/widget/palette";
   import Composer from "$lib/components/Composer.svelte";
   import MessageList from "$lib/components/MessageList.svelte";
   import PermissionPrompt from "$lib/components/PermissionPrompt.svelte";
@@ -83,6 +88,12 @@
       { id: "import", label: "Import data", group: "Your data", keywords: "restore claude chatgpt grok migrate", run: () => (app.showImport = true) },
       { id: "settings", label: "Settings", group: "App", keywords: "preferences appearance tier", run: () => app.openPage("settings") },
     ];
+    items.push(
+      ...widgetPaletteItems(app.widget, {
+        show: () => void app.saveWidget({ ...app.widget, position: "panel" }),
+        customize: () => (app.showWidgetCustomize = true),
+      }),
+    );
     if (pageAllowed("capabilities", app.tier)) {
       items.push(
         { id: "caps", label: "Capabilities", group: "App", keywords: "mcp skills plugins tools servers", run: () => app.openPage("capabilities") },
@@ -150,6 +161,12 @@
     if (width >= PANEL_DOCK_MIN_WIDTH) void app.updateConfig({ panel_hidden: !app.config.panel_hidden });
     else overlayOpen = !overlayOpen;
   }
+  // The widget moves to the toolbar whenever the panel it was placed in is not on screen.
+  const widgetPlace = $derived(effectivePosition(app.widget.position, panel !== "closed"));
+  const sessionKey = $derived(app.active?.cliSessionId ?? null);
+  $effect(() => {
+    if (sessionKey) void app.refreshSessionUsage(sessionKey);
+  });
   const waitingIds = $derived(new Set((app.active?.pending ?? []).map((p) => p.tool_use_id)));
   let transcript: ReturnType<typeof MessageList> | undefined = $state();
   function jump(id: string) {
@@ -255,6 +272,7 @@
         onterminal={app.view === "session" && active && active.items.length > 0 ? () => app.openTerminal() : undefined}
         onpanel={hasPanel ? togglePanel : undefined}
       >
+        {#if widgetPlace === "toolbar"}{@render usageWidget("toolbar")}{/if}
         {#if shouldShowChip(app.update, app.config.skipped_version)}
           <button class="pill accent" onclick={() => (app.showUpdate = true)} title="A new version of BetterClaudeUI is available">
             {#if app.update.phase === "downloading"}Updating… {Math.round((progressFraction(app.update.downloaded, app.update.total) ?? 0) * 100)}%{:else if app.update.phase === "ready"}Ready to install{:else if app.update.phase === "installing"}Installing…{:else}Update available{/if}
@@ -347,7 +365,7 @@
             days={app.usageDays}
             onrange={(d) => app.refreshUsage(d)}
             onsave={(patch) => app.updateConfig(patch)}
-            onclear={async () => { await ipc.usageClear(); await app.refreshUsage(); }}
+            onclear={async () => { await ipc.usageClear(); app.sessionLedger = {}; await app.refreshUsage(); if (sessionKey) await app.refreshSessionUsage(sessionKey); }}
             refreshing={app.limitsRefreshing}
             refreshError={app.limitsError}
             onrefreshlimits={() => app.refreshLimits()}
@@ -400,10 +418,23 @@
       {#if panel === "overlay"}<button class="scrim" aria-label="Dismiss the right panel" onclick={() => (overlayOpen = false)}></button>{/if}
       <RightPanel meta={app.activeMeta} session={app.active} projectName={findProject(app.config.projects, app.activeMeta.project)?.name ?? null} overlay={panel === "overlay"} onjump={jump} onclose={() => (overlayOpen = false)}>
         {#snippet controls()}{@render sessionControls("panel")}{/snippet}
+        {#snippet widget()}{#if widgetPlace === "panel"}{@render usageWidget("panel")}{/if}{/snippet}
       </RightPanel>
     {/if}
   </div>
+  {#if widgetPlace === "floating"}{@render usageWidget("floating")}{/if}
 {/if}
+
+{#snippet usageWidget(variant: "panel" | "floating" | "toolbar")}
+  <UsageWidget
+    settings={app.widget}
+    data={app.widgetData}
+    status={app.widgetState}
+    {variant}
+    oncustomize={() => (app.showWidgetCustomize = true)}
+    onmove={(x, y) => void app.saveWidget({ ...app.widget, x, y })}
+  />
+{/snippet}
 
 {#snippet sessionControls(variant: "panel" | "composer")}
   {#if app.activeMeta}
@@ -426,6 +457,11 @@
 
 {#if app.showPalette}
   <Palette items={paletteItems} search={searchConversations} onclose={() => (app.showPalette = false)} />
+{/if}
+{#if app.showWidgetCustomize}
+  <Dialog label="Customize the usage widget" title="Usage widget" width="560px" onclose={() => (app.showWidgetCustomize = false)}>
+    <WidgetCustomize settings={app.widget} onchange={(next) => void app.saveWidget(next)} />
+  </Dialog>
 {/if}
 {#if app.showImport}
   <ImportPanel
@@ -555,6 +591,9 @@
     padding: 0 24px 18px;
   }
   .column {
+    /* Above the floating widget (10), below dialogs (12): it can never hide Allow, Deny or Send. */
+    position: relative;
+    z-index: 11;
     max-width: var(--col, 780px);
     margin: 0 auto;
   }
