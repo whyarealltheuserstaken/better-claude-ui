@@ -23,7 +23,9 @@ Legend: [x] done · [~] in progress · [ ] todo
 
 ## UI and UX revamp (plan: `docs/superpowers/plans/2026-11-26-ui-revamp.md`)
 - [x] Stage 1: design system (readable colours derived from every theme, Solarized contrast fixed, Lucide icons, shared menu, switch and meter)
-- [ ] Stages 2 to 7: shell, conversation and right panel, Home and Usage, Settings and pages, usage widget, tray
+- [x] Stage 2: shell (sidebar holds all navigation, new toolbar with search bar, glass panels over a glow that turns amber while Claude waits, title bar follows the theme, Ctrl+B)
+- [ ] Stages 3 to 7: conversation and right panel, Home and Usage, Settings and pages, usage widget, tray
+- Note: the E2E scenarios still use the old layout until stage 5
 
 ## v0.1.0 release gate (owner decision, details in `docs/GOALS.md`)
 - [x] **In-app updater implemented and verified in the real app** (ADR 0003, `node tools/e2e.mjs updater`): signed updates, daily quiet check + manual check, release notes, progress, skip version; tampered / wrong-key / replayed installers rejected

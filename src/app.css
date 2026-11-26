@@ -45,11 +45,15 @@
   box-sizing: border-box;
 }
 
+/* Only the root paints the page colour, so the backdrop (z-index -1) stays visible. */
+html {
+  background: var(--bg);
+}
+
 html,
 body {
   height: 100%;
   margin: 0;
-  background: var(--bg);
   color: var(--text);
   font: var(--font-size, 14.5px) / calc(1.35 + 0.2 * var(--density, 1)) var(--ui);
   -webkit-font-smoothing: antialiased;

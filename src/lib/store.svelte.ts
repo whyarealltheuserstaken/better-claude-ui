@@ -48,6 +48,11 @@ const defaultConfig = (): AppConfig => ({
   skipped_version: null,
   auto_refresh_limits: false,
   refresh_limits_minutes: 15,
+  sidebar_hidden: false,
+  panel_hidden: false,
+  settings_category: "general",
+  usage_widget: null,
+  tray: null,
 });
 
 /** First user message, trimmed, as a human title for a chat. */

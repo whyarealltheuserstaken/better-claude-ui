@@ -150,6 +150,11 @@ export interface AppConfig {
   skipped_version: string | null;
   auto_refresh_limits: boolean;
   refresh_limits_minutes: number;
+  sidebar_hidden: boolean;
+  panel_hidden: boolean;
+  settings_category: string;
+  usage_widget: unknown;
+  tray: unknown;
 }
 
 export interface AgentDef {

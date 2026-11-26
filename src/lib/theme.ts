@@ -174,6 +174,7 @@ export interface Derived {
   okText: string;
   badText: string;
   sheet: string;
+  sheetAlpha: number;
   card: string;
   glassBase: string;
   glassAlpha: number;
@@ -199,11 +200,14 @@ export function deriveColors(theme: Theme): Derived {
     ? [k.bg, k.bg, k.bg]
     : neutralGlow
       ? [mix(k.bg, k.muted, 0.2), mix(k.bg, k.muted, 0.14), mix(k.bg, k.muted, 0.17)]
-      : [mix(k.bg, k.accent, 0.4), mix(k.bg, side(-45), 0.3), mix(k.bg, side(45), 0.3)];
+      : [mix(k.bg, k.accent, 0.55), mix(k.bg, side(-45), 0.42), mix(k.bg, side(45), 0.4)];
   const wait: [string, string] = solid ? [k.bg, k.bg] : [mix(k.bg, k.gate, 0.5), mix(k.bg, k.gate, 0.34)];
-  const glassAlpha = solid ? 1 : 0.76;
+  const glassAlpha = solid ? 1 : 0.66;
+  // The page itself stays near-solid: a hint of the glow comes through, the text stays clear.
+  const sheetAlpha = solid ? 1 : 0.86;
   const glass = [...glow, ...wait].map((under) => mix(under, k.surface, glassAlpha));
-  const backgrounds = [...new Set([k.bg, k.surface, k.raised, ...glass])];
+  const sheets = [...glow, ...wait].map((under) => mix(under, k.bg, sheetAlpha));
+  const backgrounds = [...new Set([k.bg, k.surface, k.raised, ...glass, ...sheets])];
   const readable = (c: string) => ensureContrast(c, backgrounds);
   return {
     solid,
@@ -217,6 +221,7 @@ export function deriveColors(theme: Theme): Derived {
     okText: readable(k.ok),
     badText: readable(k.bad),
     sheet: k.bg,
+    sheetAlpha,
     card: k.surface,
     glassBase: k.surface,
     glassAlpha,
@@ -248,7 +253,7 @@ export function appearanceVars(theme: Theme, style: StyleDef): Record<string, st
     "--text": d.text, "--muted": d.muted, "--accent": k.accent, "--accent-ink": d.accentInk,
     "--gate": k.gate, "--gate-ink": d.gateInk, "--ok": k.ok, "--bad": k.bad,
     "--accent-text": d.accentText, "--gate-text": d.gateText, "--ok-text": d.okText, "--bad-text": d.badText,
-    "--sheet": d.sheet, "--card": d.card,
+    "--sheet": `color-mix(in srgb, ${d.sheet} ${Math.round(d.sheetAlpha * 100)}%, transparent)`, "--card": d.card,
     "--glass": `color-mix(in srgb, ${d.glassBase} ${Math.round(d.glassAlpha * 100)}%, transparent)`,
     "--glow-a": d.glow[0], "--glow-b": d.glow[1], "--glow-c": d.glow[2],
     "--wait-a": d.wait[0], "--wait-b": d.wait[1],

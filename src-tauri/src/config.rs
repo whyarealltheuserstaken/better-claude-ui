@@ -41,6 +41,14 @@ pub struct AppConfig {
     pub auto_refresh_limits: bool,
     /// Minutes between automatic refreshes (5 to 180).
     pub refresh_limits_minutes: u32,
+    /// Layout preferences.
+    pub sidebar_hidden: bool,
+    pub panel_hidden: bool,
+    /// The Settings category last shown.
+    pub settings_category: String,
+    /// Usage widget and tray settings; the UI validates their shape.
+    pub usage_widget: serde_json::Value,
+    pub tray: serde_json::Value,
 }
 
 impl Default for AppConfig {
@@ -79,6 +87,11 @@ impl Default for AppConfig {
             skipped_version: None,
             auto_refresh_limits: false,
             refresh_limits_minutes: 15,
+            sidebar_hidden: false,
+            panel_hidden: false,
+            settings_category: "general".into(),
+            usage_widget: serde_json::Value::Null,
+            tray: serde_json::Value::Null,
         }
     }
 }
@@ -186,6 +199,18 @@ mod tests {
             project: None,
             updated_at: t,
         }
+    }
+
+    #[test]
+    fn an_old_config_without_the_new_fields_gets_their_defaults() {
+        let d = tmp("cfg-old");
+        std::fs::create_dir_all(&d).unwrap();
+        std::fs::write(config_path(&d), r#"{"tier":"advanced","theme":"midnight"}"#).unwrap();
+        let c = load(&d);
+        assert_eq!(c.theme, "midnight");
+        assert!(!c.sidebar_hidden && !c.panel_hidden);
+        assert_eq!(c.settings_category, "general");
+        assert!(c.usage_widget.is_null() && c.tray.is_null());
     }
 
     #[test]

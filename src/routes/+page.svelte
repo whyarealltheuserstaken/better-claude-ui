@@ -8,7 +8,10 @@
   import { reduceUpdate, shouldShowChip, progressFraction } from "$lib/updates";
   import ArtifactPreview from "$lib/components/ArtifactPreview.svelte";
   import ProjectsPanel from "$lib/components/ProjectsPanel.svelte";
-  import { pickFolder, pickImportFile } from "$lib/ipc";
+  import { pickFolder, pickImportFile, setWindowTheme } from "$lib/ipc";
+  import Backdrop from "$lib/components/Backdrop.svelte";
+  import Toolbar from "$lib/components/Toolbar.svelte";
+  import { waitingModes } from "$lib/shell";
   import Palette from "$lib/components/Palette.svelte";
   import { allStyles, allThemes } from "$lib/theme";
   import type { PaletteItem } from "$lib/palette";
@@ -53,11 +56,9 @@
     return () => mq.removeEventListener("change", on);
   });
   $effect(() => {
-    applyAppearance(
-      document.documentElement,
-      resolveTheme(app.config.theme, app.config.custom_themes, systemDark),
-      resolveStyle(app.config.style, app.config.custom_styles),
-    );
+    const theme = resolveTheme(app.config.theme, app.config.custom_themes, systemDark);
+    applyAppearance(document.documentElement, theme, resolveStyle(app.config.style, app.config.custom_styles));
+    void setWindowTheme(theme.scheme);
   });
   const paletteItems = $derived.by((): PaletteItem[] => {
     const items: PaletteItem[] = [
@@ -113,7 +114,25 @@
     });
   }
 
+  const toggleSidebar = () => void app.updateConfig({ sidebar_hidden: !app.config.sidebar_hidden });
+  const waiting = $derived(waitingModes(app.metas, app.states));
+  const waitingHere = $derived(app.view === "session" && (app.active?.pending.length ?? 0) > 0);
+
+  const heading = $derived.by((): { title: string; subtitle: string } => {
+    if (app.view === "home") return { title: "Home", subtitle: "Your usage and shortcuts" };
+    if (app.view === "usage") return { title: "Usage", subtitle: "Tokens and estimated cost on this computer" };
+    if (app.view === "archive") return { title: "Archive", subtitle: "Imported conversations" };
+    if (!app.active || !app.activeMeta) return { title: app.mode === "chat" ? "Chat" : "Code", subtitle: "" };
+    return { title: app.activeMeta.title, subtitle: app.activeMeta.mode === "chat" ? "No tools in Chat" : (app.active.cwd ?? app.activeMeta.cwd ?? "") };
+  });
+
   function onGlobalKey(e: KeyboardEvent) {
+    const typing = e.target instanceof HTMLElement && !!e.target.closest("input, textarea, select, [contenteditable]");
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b" && !typing) {
+      e.preventDefault();
+      toggleSidebar();
+      return;
+    }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
       e.preventDefault();
       app.showPalette = !app.showPalette;
@@ -141,54 +160,57 @@
 {:else if !app.config.onboarded}
   <Onboarding ondone={(t) => app.updateConfig({ tier: t, onboarded: true })} />
 {:else}
+  <Backdrop waiting={waitingHere} />
   <div class="shell">
-    <Sidebar
-      metas={app.visibleMetas}
-      states={app.states}
-      activeId={app.activeId}
-      {version}
-      mode={app.mode}
-      recents={app.recents}
-      onresume={(r) => app.resume(r)}
-      onforget={(r) => app.forget(r)}
-      onsettings={() => (app.showSettings = true)}
-      onpresets={() => (app.showPresets = true)}
-      archiveCount={app.archive.length}
-      onarchive={() => app.go("archive")}
-      advancedTools={app.tier !== "beginner"}
-      oncaps={() => (app.showCaps = true)}
-      oneditor={() => (app.showEditor = true)}
-      onselect={(id) => app.select(id)}
-      onnew={() => app.newSession()}
-      onclose={(id) => app.close(id)}
-    />
+    {#if !app.config.sidebar_hidden}
+      <Sidebar
+        metas={app.visibleMetas}
+        states={app.states}
+        activeId={app.activeId}
+        mode={app.mode}
+        view={app.view}
+        recents={app.recents}
+        projects={app.projects}
+        {waiting}
+        onmode={(m) => app.setMode(m)}
+        onhome={() => app.go("home")}
+        onusage={() => app.go("usage")}
+        onproject={(id) => void app.newSession({ projectId: id })}
+        onprojects={() => (app.showProjects = true)}
+        onresume={(r) => app.resume(r)}
+        onforget={(r) => app.forget(r)}
+        onsettings={() => (app.showSettings = true)}
+        onpresets={() => (app.showPresets = true)}
+        archiveCount={app.archive.length}
+        onarchive={() => app.go("archive")}
+        advancedTools={app.tier !== "beginner"}
+        oncaps={() => (app.showCaps = true)}
+        oneditor={() => (app.showEditor = true)}
+        onselect={(id) => app.select(id)}
+        onnew={() => app.newSession()}
+        onclose={(id) => app.close(id)}
+      />
+    {/if}
     <section class="main">
-      <div class="topbar">
-        <div class="seg" role="tablist" aria-label="Section">
-          <button role="tab" aria-selected={app.view === "home"} class:on={app.view === "home"} onclick={() => app.go("home")}>Home</button>
-          <button role="tab" aria-selected={app.view === "session" && app.mode === "chat"} class:on={app.view === "session" && app.mode === "chat"} onclick={() => app.setMode("chat")}>Chat</button>
-          <button role="tab" aria-selected={app.view === "session" && app.mode === "code"} class:on={app.view === "session" && app.mode === "code"} onclick={() => app.setMode("code")}>Code</button>
-          <button role="tab" aria-selected={app.view === "usage"} class:on={app.view === "usage"} onclick={() => app.go("usage")}>Usage</button>
-        </div>
-        {#if active && app.view === "session"}
-          <span class="cwd" title={active.cwd ?? ""}>{app.activeMeta?.mode === "chat" ? "No tools in Chat" : (active.cwd ?? "")}</span>
-        {/if}
-        {#if app.view !== "session"}<span class="cwd"></span>{/if}
+      <Toolbar
+        title={heading.title}
+        subtitle={heading.subtitle}
+        onsidebar={toggleSidebar}
+        onsearch={() => (app.showPalette = true)}
+        onexport={app.view === "session" && active && active.items.length > 0 ? () => app.exportActive() : undefined}
+        onterminal={app.view === "session" && active && active.items.length > 0 ? () => app.openTerminal() : undefined}
+      >
         {#if shouldShowChip(app.update, app.config.skipped_version)}
-          <button class="chip accent" onclick={() => (app.showUpdate = true)} title="A new version of BetterClaudeUI is available">
+          <button class="pill accent" onclick={() => (app.showUpdate = true)} title="A new version of BetterClaudeUI is available">
             {#if app.update.phase === "downloading"}Updating… {Math.round((progressFraction(app.update.downloaded, app.update.total) ?? 0) * 100)}%{:else if app.update.phase === "ready"}Ready to install{:else if app.update.phase === "installing"}Installing…{:else}Update available{/if}
           </button>
         {/if}
         {#if todayBudget.level !== "none"}
-          <button class="chip" data-level={todayBudget.level} onclick={() => app.go("usage")} title="Today's estimated cost against your daily budget">Today {fmtUsd(app.usage?.today.cost_usd ?? 0)}</button>
+          <button class="pill" data-level={todayBudget.level} onclick={() => app.go("usage")} title="Today's estimated cost against your daily budget">Today {fmtUsd(app.usage?.today.cost_usd ?? 0)}</button>
         {/if}
-        {#if app.view === "session" && active && active.items.length > 0}
-          <button class="chip" onclick={() => app.exportActive()} title="Copy this conversation as Markdown">Export</button>
-          <button class="chip" onclick={() => app.openTerminal()} title="Continue this conversation in your own terminal">Terminal</button>
-        {/if}
-        {#if app.view === "session" && active && active.costUsd > 0}<span class="tier" title="Estimated cost of this session (API prices)">{fmtUsd(active.costUsd)}</span>{/if}
-        <span class="tier">{[app.tier, app.view === "session" ? active?.model : null, app.view === "session" && app.activeMeta?.preset ? `team: ${app.activeMeta.preset}` : null].filter(Boolean).join(" · ")}</span>
-      </div>
+        {#if app.view === "session" && active && active.costUsd > 0}<span class="meta" title="Estimated cost of this session (API prices)">{fmtUsd(active.costUsd)}</span>{/if}
+        {#if app.view === "session" && app.activeMeta?.preset}<span class="meta">Team: {app.activeMeta.preset}</span>{/if}
+      </Toolbar>
       {#if app.error}
         <div class="banner" role="alert">
           {app.error}
@@ -372,47 +394,25 @@
 <style>
   .shell {
     display: flex;
+    gap: 10px;
     height: 100vh;
+    padding: 10px;
   }
   .main {
     flex: 1;
     min-width: 0;
+    min-height: 0;
     display: flex;
     flex-direction: column;
-  }
-  .topbar {
-    gap: 12px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 8px 24px;
-    border-bottom: 1px solid var(--line);
-  }
-  .seg {
-    display: inline-flex;
-    background: var(--surface);
+    background: var(--sheet);
     border: 1px solid var(--line);
-    border-radius: var(--radius);
-    padding: 2px;
+    border-radius: var(--float-radius);
+    overflow: hidden;
   }
-  .seg button {
-    background: none;
-    border: 0;
-    border-radius: var(--radius-sm);
-    padding: 4px 16px;
-    color: var(--muted);
-    font-weight: 600;
-  }
-  .seg button.on {
-    background: var(--accent);
-    color: var(--accent-ink);
-  }
-  .tier {
+  .meta {
     color: var(--muted);
     font-size: 12.5px;
-  }
-  .tier::first-letter {
-    text-transform: uppercase;
+    white-space: nowrap;
   }
   .toast {
     position: fixed;
@@ -430,26 +430,17 @@
     flex: 1;
     overflow-y: auto;
   }
-  .chip {
-    background: var(--raised);
-    border: 1px solid var(--line);
-    border-radius: 999px;
-    padding: 1px 10px;
-    font-size: 12.5px;
-    color: var(--text);
-  }
-  .chip.accent {
+  .pill.accent {
     border-color: var(--accent);
-    color: var(--accent);
-    font-weight: 600;
+    color: var(--accent-text);
   }
-  .chip[data-level="warn"] {
+  .pill[data-level="warn"] {
     border-color: var(--gate);
-    color: var(--gate);
+    color: var(--gate-text);
   }
-  .chip[data-level="over"] {
+  .pill[data-level="over"] {
     border-color: var(--bad);
-    color: var(--bad);
+    color: var(--bad-text);
   }
   .starters {
     flex: 1;
@@ -476,19 +467,6 @@
   }
   .starters button:hover {
     border-color: var(--accent);
-  }
-  .cwd {
-    flex: 1;
-    min-width: 0;
-    margin: 0 18px;
-    color: var(--muted);
-    font-size: 13px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-family: var(--mono);
-    direction: rtl;
-    text-align: left;
   }
   .dock {
     padding: 0 24px 18px;
