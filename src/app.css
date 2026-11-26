@@ -1,3 +1,5 @@
+@import "./lib/ui/ui.css";
+
 :root {
   --bg: #0f121a;
   --surface: #161a24;
