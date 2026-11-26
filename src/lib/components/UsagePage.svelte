@@ -3,6 +3,7 @@
   import { budgetState, fmtReset, fmtTokens, fmtUsd, modelLabel, pct, toCsv, windowLabel } from "../format";
   import DailyChart from "../widgets/DailyChart.svelte";
   import AutoRefresh from "./AutoRefresh.svelte";
+  import BudgetFields from "./BudgetFields.svelte";
   import Meter from "../widgets/Meter.svelte";
   import type { AppConfig, AuthStatus, LimitsSnapshot, Totals, UsageSummary } from "../types";
 
@@ -56,10 +57,6 @@
       : [],
   );
 
-  function num(v: string): number | null {
-    const n = parseFloat(v);
-    return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null;
-  }
 
   async function copyCsv() {
     if (!usage) return;
@@ -181,14 +178,7 @@
   <section class="card">
     <h2>Budgets</h2>
     <p class="sub">Optional spending alerts, in estimated dollars. The Home widgets turn amber at 80% and red when exceeded. Nothing is blocked.</p>
-    <div class="budgets">
-      <label>Daily budget ($)
-        <input type="number" min="0" step="1" value={config.budget_daily_usd ?? ""} placeholder="None" onchange={(e) => onsave({ budget_daily_usd: num(e.currentTarget.value) })} />
-      </label>
-      <label>Monthly budget ($)
-        <input type="number" min="0" step="1" value={config.budget_monthly_usd ?? ""} placeholder="None" onchange={(e) => onsave({ budget_monthly_usd: num(e.currentTarget.value) })} />
-      </label>
-    </div>
+    <BudgetFields {config} {onsave} />
   </section>
 
   <div class="foot">
@@ -219,7 +209,4 @@
   th, td { text-align: right; padding: 5px 8px; border-bottom: 1px solid var(--line); }
   th:first-child, td:first-child { text-align: left; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   th { color: var(--muted); font-weight: 600; }
-  .budgets { display: flex; gap: 20px; flex-wrap: wrap; }
-  .budgets label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
-  input { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 6px 8px; font: inherit; width: 150px; }
 </style>

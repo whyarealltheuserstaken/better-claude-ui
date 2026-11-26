@@ -49,6 +49,9 @@ for (const theme of themes) {
     });
     await step("usage", () => nav.getByRole("button", { name: "Usage" }).click());
     await step("settings", () => nav.getByRole("button", { name: "Settings" }).click());
+    const category = (name) => page.getByRole("navigation", { name: "Settings categories" }).getByRole("button", { name }).click();
+    await step("settings-appearance", () => category("Appearance"));
+    await step("settings-usage", () => category("Usage and budgets"));
     await page.close();
   }
 }

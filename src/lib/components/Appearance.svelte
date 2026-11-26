@@ -173,6 +173,7 @@
 
 <style>
   h3 { margin: 18px 0 8px; font-size: 13px; letter-spacing: 0.02em; color: var(--muted); }
+  h3:first-child { margin-top: 0; }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
   .card { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; padding: 8px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); text-align: left; }
   .card.plain { padding: 10px 12px; }

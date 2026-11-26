@@ -29,7 +29,8 @@
   import { startFromHome } from "$lib/homeStart";
   import type { PendingAttachment } from "$lib/attachments";
   import type { Mode } from "$lib/types";
-  import Settings from "$lib/components/Settings.svelte";
+  import SettingsPage from "$lib/components/SettingsPage.svelte";
+  import { CATEGORIES, cleanCategory, escapeGoesBack } from "$lib/settingsNav";
   import Composer from "$lib/components/Composer.svelte";
   import MessageList from "$lib/components/MessageList.svelte";
   import PermissionPrompt from "$lib/components/PermissionPrompt.svelte";
@@ -79,7 +80,7 @@
       { id: "archive", label: "Archive", group: "Go to", keywords: "imported conversations restored", run: () => app.go("archive") },
       { id: "export", label: "Export all my data", group: "Your data", keywords: "backup save migrate", run: () => void app.exportAll() },
       { id: "import", label: "Import data", group: "Your data", keywords: "restore claude chatgpt grok migrate", run: () => (app.showImport = true) },
-      { id: "settings", label: "Settings", group: "App", keywords: "preferences appearance tier", run: () => (app.showSettings = true) },
+      { id: "settings", label: "Settings", group: "App", keywords: "preferences appearance tier", run: () => app.openPage("settings") },
     ];
     if (app.tier !== "beginner") {
       items.push(
@@ -159,11 +160,23 @@
     if (app.view === "home") return { title: "Home", subtitle: "Your usage and shortcuts" };
     if (app.view === "usage") return { title: "Usage", subtitle: "Tokens and estimated cost on this computer" };
     if (app.view === "archive") return { title: "Archive", subtitle: "Imported conversations" };
+    if (app.view === "settings") return { title: "Settings", subtitle: CATEGORIES.find((c) => c.id === cleanCategory(app.config.settings_category))?.label ?? "" };
     if (!app.active || !app.activeMeta) return { title: app.mode === "chat" ? "Chat" : "Code", subtitle: "" };
     return { title: app.activeMeta.title, subtitle: app.activeMeta.mode === "chat" ? "No tools in Chat" : (app.active.cwd ?? app.activeMeta.cwd ?? "") };
   });
 
+  // Runs in the capture phase: once a dialog has handled Escape it is already gone from the document,
+  // and the same keypress would then leave the page too.
+  function onEscape(e: KeyboardEvent) {
+    if (escapeGoesBack(e, app.view, !!document.querySelector('[role="dialog"], [role="menu"], [role="listbox"]'))) app.back();
+  }
+
   function onGlobalKey(e: KeyboardEvent) {
+    if ((e.ctrlKey || e.metaKey) && e.key === ",") {
+      e.preventDefault();
+      app.openPage("settings");
+      return;
+    }
     const typing = e.target instanceof HTMLElement && !!e.target.closest("input, textarea, select, [contenteditable]");
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b" && !typing) {
       e.preventDefault();
@@ -188,7 +201,7 @@
 </script>
 
 <svelte:head><title>BetterClaudeUI</title></svelte:head>
-<svelte:window onkeydown={(e) => { if (e.key === "Escape") overlayOpen = false; onGlobalKey(e); }} bind:innerWidth={width} />
+<svelte:window onkeydowncapture={onEscape} onkeydown={(e) => { if (e.key === "Escape") overlayOpen = false; onGlobalKey(e); }} bind:innerWidth={width} />
 
 {#if !app.cliChecked}
   <main class="center"><p class="muted">Looking for Claude…</p></main>
@@ -216,7 +229,7 @@
         onprojects={() => (app.showProjects = true)}
         onresume={(r) => app.resume(r)}
         onforget={(r) => app.forget(r)}
-        onsettings={() => (app.showSettings = true)}
+        onsettings={() => app.openPage("settings")}
         onpresets={() => (app.showPresets = true)}
         archiveCount={app.archive.length}
         onarchive={() => app.go("archive")}
@@ -280,6 +293,22 @@
             onprojects={() => (app.showProjects = true)}
           />
         </div>
+      {:else if app.view === "settings"}
+        <SettingsPage
+          config={app.config}
+          cliVersion={version}
+          appVersion={app.appVersion}
+          update={app.update}
+          oncheck={() => app.checkUpdates(true)}
+          onviewupdate={() => (app.showUpdate = true)}
+          exportState={app.exportState}
+          onexport={() => app.exportAll()}
+          onimport={() => (app.showImport = true)}
+          limitsPaused={app.limitsPaused}
+          onautorefresh={(p) => app.setAutoRefresh(p)}
+          onsave={(patch) => app.updateConfig(patch)}
+          onback={() => app.back()}
+        />
       {:else if app.view === "archive"}
         <ArchivePage
           entries={app.archive}
@@ -426,20 +455,6 @@
 {/if}
 {#if app.showPresets}
   <PresetPicker presets={app.presets} advanced={app.tier === "advanced"} onstart={(p) => app.startPreset(p)} onclose={() => (app.showPresets = false)} />
-{/if}
-{#if app.showSettings}
-  <Settings
-    config={app.config}
-    appVersion={app.appVersion}
-    update={app.update}
-    oncheck={() => app.checkUpdates(true)}
-    onviewupdate={() => { app.showSettings = false; app.showUpdate = true; }}
-    exportState={app.exportState}
-    onexport={() => app.exportAll()}
-    onimport={() => { app.showSettings = false; app.showImport = true; }}
-    onsave={(patch) => app.updateConfig(patch)}
-    onclose={() => (app.showSettings = false)}
-  />
 {/if}
 
 <style>
