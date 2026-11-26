@@ -86,6 +86,8 @@ class AppStore {
   usage = $state<UsageSummary | null>(null);
   usageDays = $state(30);
   homeEditing = $state(false);
+  limitsRefreshing = $state(false);
+  limitsError = $state<string | null>(null);
   auth = $state<AuthStatus | null>(null);
   authSkipped = $state(false);
   presets = $state<Preset[]>([]);
@@ -245,6 +247,21 @@ class AppStore {
     if (Object.keys(patch).length > 0) await this.updateConfig(patch);
     await this.loadArchive();
     return { projectsAdded: merged.added, settingsApplied: r.settings !== null && Object.keys(settingsPatch(r.settings)).length > 0 };
+  }
+
+  /** One tiny request so Claude Code reports the current plan allowance (see limits.ts). */
+  async refreshLimits() {
+    if (this.limitsRefreshing) return;
+    this.limitsRefreshing = true;
+    this.limitsError = null;
+    try {
+      this.limits = await ipc.refreshLimits();
+      await this.refreshUsage();
+    } catch (e) {
+      this.limitsError = typeof e === "string" ? e : "Couldn't refresh right now. Please try again.";
+    } finally {
+      this.limitsRefreshing = false;
+    }
   }
 
   async refreshUsage(days?: number) {

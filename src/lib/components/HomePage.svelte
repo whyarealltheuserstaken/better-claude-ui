@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { LIMITS_NOTE, asOfLabel, mayBeBehind, windowHasReset } from "../limits";
   import { budgetState, fmtReset, fmtTokens, fmtUsd, modelLabel, pct, windowLabel } from "../format";
   import { WIDGETS, cleanWidgetList, moveWidget, toggleWidget } from "../widgets/registry";
   import DailyChart from "../widgets/DailyChart.svelte";
@@ -20,6 +21,9 @@
     onteams,
     onresume,
     onusage,
+    refreshing = false,
+    refreshError = null,
+    onrefreshlimits = () => {},
     projects = [],
     onproject,
     onprojects,
@@ -37,6 +41,9 @@
     onteams: () => void;
     onresume: (r: SavedSession) => void;
     onusage: () => void;
+    refreshing?: boolean;
+    refreshError?: string | null;
+    onrefreshlimits?: () => void;
     projects?: { id: string; name: string; cwd: string | null }[];
     onproject: (id: string, mode: "chat" | "code") => void;
     onprojects: () => void;
@@ -48,7 +55,8 @@
   const maxModel = $derived(Math.max(...(usage?.by_model.map((m) => m.totals.cost_usd) ?? [0]), 0.0001));
   const maxProj = $derived(Math.max(...(usage?.by_project.map((m) => m.totals.cost_usd) ?? [0]), 0.0001));
   const base = (p: string) => p.split(/[\\/]/).filter(Boolean).pop() ?? p;
-  const stale = $derived(limits ? Date.now() - limits.captured_at > 10 * 60_000 : false);
+  const now = $derived(Date.now());
+  const behind = $derived(limits ? mayBeBehind(limits.captured_at, now) : false);
 </script>
 
 <div class="home">
@@ -107,13 +115,21 @@
             {#each limits.windows as w (w.name)}
               {@const lvl = w.utilization >= 1 ? "over" : w.utilization >= 0.8 ? "warn" : "ok"}
               <div class="win">
-                <div class="rowline"><span>{windowLabel(w.name)}</span><strong>{pct(w.utilization)}</strong></div>
-                <Meter fraction={w.utilization} level={lvl} label="{windowLabel(w.name)} used" />
-                <div class="sub">Resets {fmtReset(w.resets_at)}</div>
+                {#if windowHasReset(w.resets_at, now)}
+                  <div class="rowline"><span>{windowLabel(w.name)}</span><strong class="sub">reset</strong></div>
+                  <Meter fraction={0} label="{windowLabel(w.name)} was reset" />
+                  <div class="sub">This window has reset since the last update. Refresh to see the new number.</div>
+                {:else}
+                  <div class="rowline"><span>{windowLabel(w.name)}</span><strong>{pct(w.utilization)}</strong></div>
+                  <Meter fraction={w.utilization} level={lvl} label="{windowLabel(w.name)} used" />
+                  <div class="sub">Resets {fmtReset(w.resets_at)}</div>
+                {/if}
               </div>
             {/each}
             {#if limits.using_overage}<p class="sub warn">Using extra usage beyond your plan.</p>{/if}
-            {#if stale}<p class="sub">Last updated {Math.round((Date.now() - limits.captured_at) / 60000)} min ago.</p>{/if}
+            <p class="sub" class:warn={behind}>Updated {asOfLabel(limits.captured_at, now)}{behind ? ", may be behind" : ""}. {LIMITS_NOTE}</p>
+            <button class="link" disabled={refreshing} onclick={onrefreshlimits} title="Sends one tiny request (about a tenth of a cent in API terms) so Claude Code reports your current allowance. It counts a hair toward your allowance.">{refreshing ? "Refreshing…" : "Refresh now"}</button>
+            {#if refreshError}<p class="sub warn" role="alert">{refreshError}</p>{/if}
           {/if}
         {:else if id === "spend-today" || id === "spend-month"}
           {@const t = usage ? (id === "spend-today" ? usage.today : usage.month) : null}

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { LIMITS_NOTE, asOfLabel, mayBeBehind, windowHasReset } from "../limits";
   import { budgetState, fmtReset, fmtTokens, fmtUsd, modelLabel, pct, toCsv, windowLabel } from "../format";
   import DailyChart from "../widgets/DailyChart.svelte";
   import Meter from "../widgets/Meter.svelte";
@@ -14,6 +15,9 @@
     onsave,
     onclear,
     onopen,
+    refreshing = false,
+    refreshError = null,
+    onrefreshlimits = () => {},
   }: {
     config: AppConfig;
     usage: UsageSummary | null;
@@ -24,7 +28,12 @@
     onsave: (patch: Partial<AppConfig>) => void;
     onclear: () => void;
     onopen: (url: string) => void;
+    refreshing?: boolean;
+    refreshError?: string | null;
+    onrefreshlimits?: () => void;
   } = $props();
+
+  const now = $derived(Date.now());
 
   let metric = $state<"cost" | "tokens">("cost");
   let copied = $state(false);
@@ -88,17 +97,26 @@
     {:else}
       {#each limits.windows as w (w.name)}
         <div class="win">
-          <div class="rowline"><span>{windowLabel(w.name)}</span><span><strong>{pct(w.utilization)}</strong> used · resets {fmtReset(w.resets_at)}</span></div>
-          <Meter fraction={w.utilization} level={w.utilization >= 1 ? "over" : w.utilization >= 0.8 ? "warn" : "ok"} label="{windowLabel(w.name)} used" />
+          {#if windowHasReset(w.resets_at, now)}
+            <div class="rowline"><span>{windowLabel(w.name)}</span><span class="sub">reset since the last update, refresh to see the new number</span></div>
+            <Meter fraction={0} label="{windowLabel(w.name)} was reset" />
+          {:else}
+            <div class="rowline"><span>{windowLabel(w.name)}</span><span><strong>{pct(w.utilization)}</strong> used · resets {fmtReset(w.resets_at)}</span></div>
+            <Meter fraction={w.utilization} level={w.utilization >= 1 ? "over" : w.utilization >= 0.8 ? "warn" : "ok"} label="{windowLabel(w.name)} used" />
+          {/if}
         </div>
       {/each}
       {#if limits.using_overage}<p class="warn">You are using extra usage beyond your plan.</p>{/if}
+      <p class="sub" class:warn={mayBeBehind(limits.captured_at, now)}>Updated {asOfLabel(limits.captured_at, now)}{mayBeBehind(limits.captured_at, now) ? ", may be behind" : ""}. {LIMITS_NOTE}</p>
     {/if}
     <div class="links">
+      <button disabled={refreshing} onclick={onrefreshlimits} title="Sends one tiny request (about a tenth of a cent in API terms) so Claude Code reports your current allowance. It counts a hair toward your allowance.">{refreshing ? "Refreshing…" : "Refresh allowance"}</button>
       <button onclick={() => onopen("https://claude.ai/settings/usage")}>Open plan usage on claude.ai</button>
       <button onclick={() => onopen("https://console.anthropic.com/settings/billing")}>Open API billing</button>
     </div>
   </section>
+
+  {#if refreshError}<p class="warn" role="alert">{refreshError}</p>{/if}
 
   <div class="periods">
     {#each periods as p (p.label)}

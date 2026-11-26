@@ -786,3 +786,59 @@ pub fn archive_get(id: String) -> Option<crate::exchange::archive::ArchiveDoc> {
 pub fn archive_delete(id: String) -> Result<(), String> {
     crate::exchange::archive::delete(&platform::config_dir(), &id).map_err(|e| e.to_string())
 }
+
+/// Ask Claude Code for the current plan allowance with one tiny request (about a tenth of a cent
+/// in API-equivalent cost). The CLI reports allowance only alongside a reply, so this is the only
+/// way to refresh it without sending a real message. The cost is recorded in the usage ledger.
+#[tauri::command]
+pub async fn refresh_limits() -> Result<LimitsSnapshot, String> {
+    let CliStatus::Found { path, .. } = tokio::task::spawn_blocking(|| detect::detect(None))
+        .await
+        .map_err(|e| e.to_string())?
+    else {
+        return Err("Claude Code isn't installed.".into());
+    };
+    let dir = platform::config_dir();
+    let cwd = config::chat_scratch_dir(&dir).map_err(|e| e.to_string())?;
+    let mut cmd = Command::new(path);
+    cmd.args(usage::refresh_args()).current_dir(cwd);
+    let lines = Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+    let sink = lines.clone();
+    let run = setup::run_streaming(cmd, move |l| sink.lock().unwrap().push(l));
+    tokio::time::timeout(std::time::Duration::from_secs(60), run)
+        .await
+        .map_err(|_| "That took too long. Try again in a moment.".to_string())??;
+    let lines = lines.lock().unwrap().clone();
+    // Record the (tiny) spend honestly. Each of these processes starts from zero, so the
+    // reported per-model totals are already per-request.
+    let ts = now_ms();
+    let records: Vec<Record> = lines
+        .iter()
+        .filter_map(|l| crate::cli::events::parse_line(l).ok())
+        .flatten()
+        .filter_map(|e| match e {
+            Event::TurnResult { models, .. } => Some(models),
+            _ => None,
+        })
+        .flatten()
+        .map(|m| Record {
+            ts,
+            session: "limits-refresh".into(),
+            project: None,
+            mode: "chat".into(),
+            preset: None,
+            model: m.model,
+            input: m.input,
+            output: m.output,
+            cache_read: m.cache_read,
+            cache_write: m.cache_write,
+            cost_usd: m.cost_usd,
+        })
+        .collect();
+    let _ = usage::append(&dir, &records);
+    let snap = usage::snapshot_from_lines(&lines, ts).ok_or_else(|| {
+        "Claude Code didn't report your allowance this time. Please try again.".to_string()
+    })?;
+    usage::save_limits(&dir, &snap).map_err(|e| e.to_string())?;
+    Ok(snap)
+}

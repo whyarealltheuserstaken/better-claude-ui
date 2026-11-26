@@ -17,6 +17,7 @@ export const ipc = {
   runSetupStep: (step: "install" | "login") => invoke<number | null>("run_setup_step", { step }),
   usageSummary: (days: number) => invoke<UsageSummary>("usage_summary", { offsetMinutes: -new Date().getTimezoneOffset(), days }),
   usageLimits: () => invoke<LimitsSnapshot | null>("usage_limits"),
+  refreshLimits: () => invoke<LimitsSnapshot>("refresh_limits"),
   usageClear: () => invoke<void>("usage_clear"),
   readConfigFile: (target: string, project: string | null) => invoke<string>("read_config_file", { target, project }),
   writeConfigFile: (target: string, project: string | null, content: string) =>
