@@ -2,6 +2,7 @@
   import { onDestroy, onMount } from "svelte";
   import { ipc, onSetupLog } from "../ipc";
   import type { AuthStatus, CliStatus } from "../types";
+  import Backdrop from "./Backdrop.svelte";
 
   let {
     cli,
@@ -56,6 +57,7 @@
   }
 </script>
 
+<Backdrop waiting={false} />
 <main class="wizard">
   <h1>Let's get Claude ready</h1>
   <p class="lead">BetterClaudeUI runs on the official Claude Code tool, so two things need to be in place. This takes a few minutes, once.</p>
@@ -124,16 +126,16 @@
   .mark { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--raised); font-size: 12.5px; }
   .done .mark { background: var(--ok); color: var(--bg); }
   p { margin: 6px 0; }
-  .ok { color: var(--ok); }
+  .ok { color: var(--ok-text); }
   .muted { color: var(--muted); }
   code, .cmd { font-family: var(--mono); }
   code { background: var(--raised); padding: 0.1em 0.4em; border-radius: var(--radius-sm); }
   .cmd { background: var(--raised); padding: 8px 12px; border-radius: var(--radius-sm); overflow-x: auto; margin: 6px 0; font-size: 12.5px; }
   .row { display: flex; gap: 10px; margin: 12px 0 4px; flex-wrap: wrap; }
   input { flex: 1; min-width: 200px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 8px 10px; font: inherit; }
-  button { background: var(--raised); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 8px 16px; }
+  button { min-height: 30px; background: var(--fill); color: var(--text); border: 1px solid transparent; border-radius: var(--capsule); padding: 6px 16px; }
   button.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; font-weight: 600; }
   button:disabled { opacity: 0.5; cursor: default; }
-  .note { color: var(--gate); }
+  .note { color: var(--gate-text); }
   .log { max-height: 200px; overflow: auto; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 8px; font: 12px/1.5 var(--mono); white-space: pre-wrap; }
 </style>

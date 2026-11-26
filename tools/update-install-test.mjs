@@ -67,10 +67,11 @@ try {
 
   // ---- 3. drive the update in the real UI ----
   await page.getByRole("button", { name: "Settings", exact: true }).click();
-  const settings = page.getByRole("dialog", { name: "Settings" });
+  await page.getByRole("navigation", { name: "Settings categories" }).getByRole("button", { name: "Updates" }).click();
+  const settings = page.locator("section.main");
   await settings.getByRole("button", { name: "Check for updates" }).click();
-  await page.waitForFunction(() => /is available/.test(document.querySelector(".updstatus")?.textContent ?? ""));
-  log("check found: " + (await settings.locator(".updstatus").innerText()).trim());
+  await page.waitForFunction(() => /is available/.test(document.querySelector("p.status")?.textContent ?? ""));
+  log("check found: " + (await settings.locator("p.status").innerText()).trim());
   await settings.getByRole("button", { name: "View update" }).click();
   const panel = page.getByRole("dialog", { name: "App update" });
   await panel.getByRole("button", { name: "Download update" }).click();

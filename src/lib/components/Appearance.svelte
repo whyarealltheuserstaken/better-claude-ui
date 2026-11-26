@@ -1,6 +1,6 @@
 <script lang="ts">
   import {
-    COLOR_KEYS, allStyles, allThemes, duplicateId, resolveTheme, sanitizeStyle, sanitizeTheme,
+    COLOR_KEYS, failingKeys, allStyles, allThemes, duplicateId, resolveTheme, sanitizeStyle, sanitizeTheme,
     type StyleDef, type Theme,
   } from "../theme";
   import type { AppConfig } from "../types";
@@ -11,6 +11,8 @@
   const styles = $derived(allStyles(config.custom_styles));
   const dark = typeof matchMedia === "function" && matchMedia("(prefers-color-scheme: dark)").matches;
   const theme = $derived(resolveTheme(config.theme, config.custom_themes, dark));
+  // Names of the colours shown differently from what was saved, for a custom theme only.
+  const adjusted = $derived(theme.custom ? failingKeys(theme).map((key) => COLOR_KEYS.find((c) => c.key === key)?.label ?? key) : []);
   const style = $derived(styles.find((s) => s.id === config.style) ?? styles[0]);
 
   let ioMode = $state<null | "theme" | "style">(null);
@@ -113,6 +115,9 @@
     {/each}
     <button class="danger" onclick={deleteTheme}>Delete theme</button>
   </div>
+  {#if adjusted.length > 0}
+    <p class="note" role="status">{adjusted.join(", ")}: adjusted so text stays readable. Your saved colours are unchanged.</p>
+  {/if}
 {/if}
 
 <h3>Style</h3>
@@ -173,6 +178,7 @@
 
 <style>
   h3 { margin: 18px 0 8px; font-size: 13px; letter-spacing: 0.02em; color: var(--muted); }
+  h3:first-child { margin-top: 0; }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
   .card { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; padding: 8px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); text-align: left; }
   .card.plain { padding: 10px 12px; }
@@ -191,6 +197,7 @@
   input:not([type="color"]):not([type="range"]), select, textarea { background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 5px 8px; font: inherit; }
   textarea { width: 100%; font-family: var(--mono); font-size: 12px; }
   .io { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
-  .err { color: var(--bad); margin: 0; }
+  .err { color: var(--bad-text); margin: 0; }
+  .note { margin: 8px 0 0; font-size: 13px; color: var(--gate-text); }
   small { color: var(--muted); }
 </style>

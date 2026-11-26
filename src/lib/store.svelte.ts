@@ -8,6 +8,7 @@ import { ipc, onSessionEvent, onUpdateProgress, pickFolder } from "./ipc";
 import { type UpdateProblem, type UpdateState, installBlockedReason, reduceUpdate, shouldAutoCheck } from "./updates";
 import { addUserMessage, initialState, reduce, removePending, restoreItems } from "./reducer";
 import { type Caps, capsFor, normalizeTier } from "./tier";
+import { type PageView, type View, isPage } from "./settingsNav";
 import type { AppConfig, AuthStatus, LimitsSnapshot, UsageSummary, ChatItem, Preset, CliStatus, Mode, SavedSession, SessionState, StartOptions } from "./types";
 
 export interface SessionMeta {
@@ -73,19 +74,17 @@ class AppStore {
   states = $state<Record<string, SessionState>>({});
   activeId = $state<string | null>(null);
   error = $state<string | null>(null);
-  showSettings = $state(false);
   showPresets = $state(false);
-  showCaps = $state(false);
   showPalette = $state(false);
-  showProjects = $state(false);
   update = $state<UpdateState>({ phase: "idle" });
   appVersion = $state("");
   showUpdate = $state(false);
   preview = $state<{ code: string; lang: string } | null>(null);
   toast = $state<string | null>(null);
   private toastTimer: ReturnType<typeof setTimeout> | null = null;
-  showEditor = $state(false);
-  view = $state<"home" | "session" | "usage" | "archive">("home");
+  view = $state<View>("home");
+  /** Where Back goes: the screen that was open before the first page. */
+  private beforePage: View = "home";
   archive = $state<ArchiveEntry[]>([]);
   viewing = $state<{ entry: ArchiveEntry; doc: ArchiveDoc } | null>(null);
   showImport = $state(false);
@@ -310,8 +309,17 @@ class AppStore {
     this.usage = await ipc.usageSummary(this.usageDays).catch(() => this.usage);
   }
 
-  go(view: "home" | "session" | "usage" | "archive") {
+  go(view: View) {
     this.view = view;
+  }
+
+  openPage(page: PageView) {
+    if (!isPage(this.view)) this.beforePage = this.view;
+    this.view = page;
+  }
+
+  back() {
+    if (isPage(this.view)) this.view = this.beforePage;
   }
 
   async checkCli(overridePath?: string | null) {

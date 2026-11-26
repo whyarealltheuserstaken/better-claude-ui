@@ -215,10 +215,10 @@ The parser, broker and registry were written test-first with a RED run observed.
 
 ## 10m. UI and UX revamp (in progress)
 - Spec and plan: `docs/superpowers/specs/2026-11-26-ui-revamp-design.md`, `docs/superpowers/plans/2026-11-26-ui-revamp.md`. Progress log (local, git-ignored): `.superpowers/sdd/2026-11-26-ui-revamp/progress.md`.
-- **Done:** stages 1 to 4 (design system, shell, conversation and right panel, Home and Usage). **Next:** Task 10 onward (Settings and other pages, remaining dialogs and screens, usage widget, tray).
-- **Verified only** by Vitest, type check, CI and screenshots against the browser mock backend (`npm run dev`, then `node tools/screenshots.mjs <dir>`). The revamped UI has **not** been run as the real Tauri app, so the title bar theme and real sessions are unchecked.
-- `tools/e2e.mjs` still uses the old layout; update it in Task 12.
-- Until Task 10/11: Settings, Projects, Capabilities and Instructions are still pop-ups, and the Claude Code version shows only in the Home "Setup status" widget.
+- **Done:** stages 1 to 5 (design system, shell, conversation and right panel, Home and Usage, Settings and the other pages, dialogs). **Next:** Task 13 onward (usage widget, then tray).
+- **Verified** by Vitest, type check, CI, screenshots against the mock backend (`npm run dev`, then `node tools/screenshots.mjs <dir>`), and the real app on Windows: E2E `data`, `basic`, `caps` and `projects` passed on 2026-11-26.
+- **Not checked in the real app:** title bar colours (no scenario looks at them). `attach`, `chat`, `limits`, `autorefresh`, `preview`, `probe`, `updater` and `tools/update-install-test.mjs` have not run since the layout changed; their selectors were updated but are unproven.
+- Two things only a real browser shows: a page's Escape check must run in the capture phase (a closing dialog is gone before a normal window handler runs), and dialogs must use `ui/Dialog.svelte` so focus and Escape work.
 - The whole-branch review at the end of the plan has not happened yet.
 - Shell heredocs fail on long scripts here: use the Write tool for those.
 
