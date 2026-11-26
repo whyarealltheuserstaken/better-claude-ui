@@ -1,6 +1,6 @@
 // End-to-end test of the REAL app against the REAL `claude` CLI, driven over WebView2's debug port.
 // Windows: starts `npm run tauri dev` itself. Usage: node tools/e2e.mjs
-// Scenarios: `node tools/e2e.mjs` (permission flow, default), `attach` (image + text attachments in Chat), `caps` (slash menu, capabilities panel, CLAUDE.md editor), `chat` (palette, web search in Chat, tool lockdown, export), `projects` (project instructions applied to a chat, conversation search), `autorefresh` (timer-driven refresh, nothing clicked; THROWAWAY profile), `limits` (stale allowance snapshot, reset window, live Refresh; THROWAWAY profile), `data` (export, import of Claude.ai/ChatGPT/Markdown files, archive, continue in a new chat; runs in a THROWAWAY profile), `updater` (in-app updater against a local signed test server; never installs anything).
+// Scenarios: `node tools/e2e.mjs` (permission flow, default), `attach` (image + text attachments in Chat), `caps` (slash menu, capabilities panel, CLAUDE.md editor), `chat` (palette, web search in Chat, tool lockdown, export), `projects` (project instructions applied to a chat, conversation search), `autorefresh` (timer-driven refresh, nothing clicked; THROWAWAY profile), `limits` (stale allowance snapshot, reset window, live Refresh; THROWAWAY profile), `data` (export, import of Claude.ai/ChatGPT/Markdown files, archive, continue in a new chat; runs in a THROWAWAY profile), `widget` (live token counts in the usage widget, two short Haiku replies; THROWAWAY profile), `updater` (in-app updater against a local signed test server; never installs anything).
 // Uses your claude login (a few cents of tokens). Exits non-zero on failure.
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, rmSync, readFileSync } from "node:fs";
@@ -73,6 +73,16 @@ if (scenario === "data") {
   mkdirSync(join(dataInbox, "out"), { recursive: true });
 }
 
+let widgetProfile = null;
+if (scenario === "widget") {
+  const { writeFileSync } = await import("node:fs");
+  widgetProfile = join(tmpdir(), `bcu-e2e-widget-${process.pid}`);
+  rmSync(widgetProfile, { recursive: true, force: true });
+  mkdirSync(widgetProfile, { recursive: true });
+  writeFileSync(join(widgetProfile, "config.json"), JSON.stringify({ onboarded: true, tier: "intermediate", auto_update_check: false, default_model: "haiku" }));
+  process.env.BCU_CONFIG_DIR = widgetProfile; // debug-only override: the real profile is never touched
+}
+
 let updateServer = null;
 if (scenario === "updater") {
   updateServer = await startUpdateServer({ port: 9488, realArtifact: process.env.BCU_REAL_ARTIFACT ?? null, replayArtifact: process.env.BCU_REPLAY_ARTIFACT ?? null });
@@ -128,6 +138,69 @@ try {
   step("Home visible, CLI detected");
   // Ask the app itself: where the version is shown depends on the Home layout the user has chosen.
   await page.waitForFunction(async () => { const { app } = await import("/src/lib/store.svelte.ts"); return app.cli?.state === "found"; });
+
+  if (scenario === "widget") {
+    const expect = (cond, msg) => { if (!cond) throw new Error(msg); };
+    const sum = (t) => (t ? t.input + t.output + t.cache_read + t.cache_write : 0);
+    const read = () =>
+      page.evaluate(async () => {
+        const { app } = await import("/src/lib/store.svelte.ts");
+        const { ipc } = await import("/src/lib/ipc.ts");
+        const cid = app.active?.cliSessionId ?? null;
+        return {
+          status: app.active?.status ?? null,
+          replies: app.active?.items.filter((i) => i.kind === "assistant").length ?? 0,
+          data: JSON.parse(JSON.stringify(app.widgetData)),
+          ledger: cid ? await ipc.usageSession(cid) : null,
+          shown: document.querySelector('section[aria-label="Usage widget"]')?.innerText.replace(/\s+/g, " ") ?? "",
+          error: app.error,
+        };
+      });
+    await page.evaluate(async () => {
+      const { app } = await import("/src/lib/store.svelte.ts");
+      app.setMode("chat");
+      await app.newSession();
+    });
+    let turns = 0;
+    for (const prompt of ["In about 200 words, explain why the sea has tides.", "Now say the same in about 60 words."]) {
+      const before = turns ? await read() : null;
+      const box = page.getByLabel("Message", { exact: true });
+      await box.fill(prompt);
+      await box.press("Enter");
+      const live = [];
+      let now = await read();
+      for (let i = 0; i < 400; i++) {
+        now = await read();
+        if (now.error) throw new Error("app error: " + now.error);
+        if (now.status === "running" && now.data.reply) live.push({ reply: sum(now.data.reply), session: sum(now.data.session), shown: now.shown });
+        if (i > 3 && now.status !== "running") break;
+        await page.waitForTimeout(150);
+      }
+      turns += 1;
+      await page.waitForTimeout(2000); // the usage log is read again shortly after the reply
+      const done = await read();
+      step(`reply ${turns}: ${live.length} samples while running, first ${live[0]?.reply ?? "none"}, last ${live.at(-1)?.reply ?? "none"}`);
+      step(`reply ${turns} finished: widget reply ${sum(done.data.reply)}, session ${sum(done.data.session)}, usage log ${sum(done.ledger)}, cost ${done.data.sessionCost}`);
+      step("widget shows: " + done.shown);
+      expect(live.length > 0 && live.at(-1).reply > 0, "no token count appeared while the reply was running");
+      expect(sum(done.data.reply) > 0, "no token count after the reply");
+      expect(sum(done.data.session) === sum(done.ledger), "the session total differs from the usage log");
+      const earlier = sum(before?.ledger);
+      expect(sum(done.ledger) - earlier === sum(done.data.reply), `finished reply (${sum(done.data.reply)}) differs from what the usage log added (${sum(done.ledger) - earlier})`);
+      expect(done.shown.includes("This reply") && !done.shown.includes("NaN"), "the widget is not showing its readings");
+      expect(done.data.sessionCost > 0, "no session cost after the reply");
+    }
+    const limits = await page.evaluate(async () => (await import("/src/lib/store.svelte.ts")).app.limits?.windows.map((w) => `${w.name} ${Math.round(w.utilization * 100)}%`) ?? []);
+    step("plan limits seen: " + (limits.join(", ") || "none reported"));
+    if (shots) await page.screenshot({ path: join(shots, "widget.png") });
+    await tidy();
+    const { homedir } = await import("node:os");
+    const cliDir = join(homedir(), ".claude", "projects", widgetProfile.replace(/[^A-Za-z0-9]/g, "-") + "-chat");
+    if (cliDir.includes("bcu-e2e-widget") && existsSync(cliDir)) rmSync(cliDir, { recursive: true, force: true });
+    console.log("E2E WIDGET PASSED");
+    cleanup(0);
+    await new Promise(() => {});
+  }
 
   if (scenario === "autorefresh") {
     const fsx = await import("node:fs");

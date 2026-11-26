@@ -28,7 +28,9 @@ Legend: [x] done · [~] in progress · [ ] todo
 - [x] Stage 4: Home message box (Chat or Code, optional project, asks for a folder only when needed, keeps the draft if nothing was sent) and restyled Home and Usage
 - [x] Stage 5: Settings is a page with categories (Ctrl+, and Escape), Projects, Capabilities and Instructions are pages (unsaved Instructions text is kept while the app runs), dialogs take focus and close with Escape, custom themes say which colours are adjusted, E2E selectors updated
 - [x] Real-app E2E on the new layout (2026-11-26, Windows): `data`, `basic`, `caps`, `projects` passed. Not re-run: `attach`, `chat`, `limits`, `autorefresh`, `preview`, `probe`, `updater`, the real update-install test
-- [ ] Stages 6 and 7: usage widget, tray
+- [x] Stage 6: usage widget (right panel, floating, toolbar or hidden; nine readings, three sizes; customized from its gear, Settings or the command palette) with token counts that move while Claude replies. It reads only local data and never sends a request
+- [x] Real-app check of the widget (2026-11-26, Windows, Claude Haiku, `node tools/e2e.mjs widget`): counts appeared during two replies, and each finished total matched the usage log exactly. Not checked in the real app: a reply that uses a helper agent, and dragging the floating widget (checked in Edge against the mock backend)
+- [ ] Stage 7: tray
 
 ## v0.1.0 release gate (owner decision, details in `docs/GOALS.md`)
 - [x] **In-app updater implemented and verified in the real app** (ADR 0003, `node tools/e2e.mjs updater`): signed updates, daily quiet check + manual check, release notes, progress, skip version; tampered / wrong-key / replayed installers rejected
