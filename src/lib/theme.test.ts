@@ -1,8 +1,9 @@
 import { describe, expect, test } from "vitest";
 import {
   BUILTIN_STYLES, BUILTIN_THEMES, allStyles, allThemes, appearanceVars, duplicateId,
-  resolveStyle, resolveTheme, sanitizeStyle, sanitizeTheme,
+  resolveStyle, resolveTheme, sanitizeStyle, sanitizeTheme, adjustedKeys, deriveColors,
 } from "./theme";
+import { contrast } from "./color";
 
 describe("themes", () => {
   test("every built-in theme has valid 6-digit hex colours and a unique id", () => {
@@ -76,5 +77,39 @@ describe("duplicateId", () => {
     expect(duplicateId("graphite", [])).toBe("graphite-copy");
     expect(duplicateId("graphite", ["graphite-copy"])).toBe("graphite-copy-2");
     expect(duplicateId("graphite-copy", ["graphite-copy", "graphite-copy-2"])).toBe("graphite-copy-3");
+  });
+});
+
+describe("derived colours", () => {
+  test.each(BUILTIN_THEMES.map((t) => [t.id, t] as const))("%s keeps text readable on every surface", (_id, t) => {
+    const d = deriveColors(t);
+    for (const key of ["text", "muted", "accentText", "gateText", "okText", "badText"] as const)
+      for (const bg of d.backgrounds) expect(contrast(d[key], bg), `${key} on ${bg}`).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(d.accentInk, t.colors.accent)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(d.gateInk, t.colors.gate)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  test("an unreadable custom theme is fixed on screen without changing the saved colours", () => {
+    const bad = sanitizeTheme({ id: "bad", name: "Bad", scheme: "dark", colors: { bg: "#202020", text: "#202020" } })!;
+    const saved = structuredClone(bad.colors);
+    const d = deriveColors(bad);
+    expect(contrast(d.text, bad.colors.bg)).toBeGreaterThanOrEqual(4.5);
+    expect(bad.colors).toEqual(saved);
+    expect(adjustedKeys(bad)).toContain("text");
+  });
+
+  test("high contrast is solid; themes whose accent is close to the waiting colour get a neutral glow", () => {
+    const by = (id: string) => deriveColors(resolveTheme(id, [], true));
+    expect(by("high-contrast").solid).toBe(true);
+    expect(by("graphite").solid).toBe(false);
+    expect(by("terminal-amber").neutralGlow).toBe(true);
+    expect(by("high-contrast").neutralGlow).toBe(true);
+    expect(by("graphite").neutralGlow).toBe(false);
+  });
+
+  test("the new variables are emitted", () => {
+    const v = appearanceVars(BUILTIN_THEMES[0], resolveStyle("modern", []));
+    for (const k of ["--sheet", "--card", "--glass", "--accent-text", "--gate-text", "--ok-text", "--bad-text", "--glow-a", "--glow-b", "--glow-c", "--wait-a", "--wait-b"])
+      expect(v[k], k).toBeTruthy();
   });
 });
