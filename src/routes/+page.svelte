@@ -25,6 +25,10 @@
   import SessionControls from "$lib/components/SessionControls.svelte";
   import RightPanel from "$lib/components/RightPanel.svelte";
   import { findProject } from "$lib/projects";
+  import HomeComposer from "$lib/components/HomeComposer.svelte";
+  import { startFromHome } from "$lib/homeStart";
+  import type { PendingAttachment } from "$lib/attachments";
+  import type { Mode } from "$lib/types";
   import Settings from "$lib/components/Settings.svelte";
   import Composer from "$lib/components/Composer.svelte";
   import MessageList from "$lib/components/MessageList.svelte";
@@ -114,6 +118,22 @@
       const r = app.config.recents.find((x) => x.cli_session_id === h.cli_session_id);
       return r ? [{ id: "hit-" + h.cli_session_id, label: `${r.title}: ${h.snippet}`, group: "In conversation", run: () => void app.resume(r) }] : [];
     });
+  }
+
+  async function startAtHome(text: string, attachments: PendingAttachment[], mode: Mode, projectId: string | null): Promise<boolean> {
+    const result = await startFromHome(
+      {
+        pickFolder,
+        start: (m, o) => {
+          app.mode = m;
+          return app.newSession({ cwd: o.cwd, projectId: o.projectId });
+        },
+        // A composer "send" adds the message to the transcript, so it stays visible even if delivery fails.
+        send: (t, a) => app.send(t, a),
+      },
+      { text, attachments, mode, projectId, projectCwd: findProject(app.config.projects, projectId)?.cwd ?? null },
+    );
+    return result === "sent";
   }
 
   const toggleSidebar = () => void app.updateConfig({ sidebar_hidden: !app.config.sidebar_hidden });
@@ -235,6 +255,7 @@
       {/if}
       {#if app.view === "home"}
         <div class="scrollpage">
+          <HomeComposer initialMode={app.mode} projects={app.projects} onstart={startAtHome} />
           <HomePage
             config={app.config}
             usage={app.usage}
