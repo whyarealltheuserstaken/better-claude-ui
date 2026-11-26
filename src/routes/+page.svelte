@@ -11,6 +11,7 @@
   import { pickFolder, pickImportFile, setWindowTheme } from "$lib/ipc";
   import Backdrop from "$lib/components/Backdrop.svelte";
   import Toolbar from "$lib/components/Toolbar.svelte";
+  import Icon from "$lib/ui/Icon.svelte";
   import { PANEL_DOCK_MIN_WIDTH, panelState, waitingModes } from "$lib/shell";
   import Palette from "$lib/components/Palette.svelte";
   import { allStyles, allThemes } from "$lib/theme";
@@ -359,9 +360,11 @@
         {#if active.items.length === 0}
           <div class="starters">
             <h2>{app.activeMeta?.mode === "chat" ? "Ask anything" : "Where should Claude start?"}</h2>
-            {#each app.activeMeta?.mode === "chat" ? CHAT_STARTERS : CODE_STARTERS as s (s)}
-              <button onclick={() => app.send(s)}>{s}</button>
-            {/each}
+            <div class="list">
+              {#each app.activeMeta?.mode === "chat" ? CHAT_STARTERS : CODE_STARTERS as s (s)}
+                <button onclick={() => app.send(s)}><span>{s}</span><Icon name="chevronRight" /></button>
+              {/each}
+            </div>
           </div>
         {:else}
           <MessageList bind:this={transcript} items={active.items} {waitingIds} diffs={app.caps.diffs} oncopy={(t) => app.copyText(t)} onpreview={(code, lang) => (app.preview = { code, lang })} />
@@ -384,11 +387,11 @@
           {#if app.mode === "chat"}
             <h1>What is on your mind?</h1>
             <p>Chat with Claude. No files or commands are touched in this mode.</p>
-            <button onclick={() => app.newSession()}>Start a chat</button>
+            <button class="btn btn-primary" onclick={() => app.newSession()}>Start a chat</button>
           {:else}
             <h1>What are we working on?</h1>
             <p>Pick a project folder and Claude will work inside it.</p>
-            <button onclick={() => app.newSession()}>Choose a folder</button>
+            <button class="btn btn-primary" onclick={() => app.newSession()}>Choose a folder</button>
           {/if}
         </div>
       {/if}
@@ -526,15 +529,27 @@
     font-size: 22px;
     letter-spacing: -0.015em;
   }
-  .starters button {
-    text-align: left;
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    padding: 11px 14px;
+  .starters .list {
+    overflow: hidden;
   }
-  .starters button:hover {
-    border-color: var(--accent);
+  .starters .list button {
+    width: 100%;
+    justify-content: space-between;
+    min-height: 44px;
+    background: none;
+    border-width: 0;
+    text-align: left;
+  }
+  .starters .list button + button {
+    border-top-width: 1px;
+    border-top-style: solid;
+    border-top-color: var(--line);
+  }
+  .starters .list button:hover {
+    background: var(--fill);
+  }
+  .starters .list :global(.icon) {
+    color: var(--muted);
   }
   .dock {
     padding: 0 24px 18px;
@@ -558,16 +573,12 @@
     margin: 0 0 20px;
   }
   .empty button {
-    background: var(--accent);
-    color: var(--accent-ink);
-    border: 0;
-    border-radius: var(--radius);
-    padding: 10px 22px;
-    font-weight: 600;
+    min-height: 38px;
+    padding: 6px 22px;
   }
   .banner {
     background: color-mix(in srgb, var(--bad) 14%, var(--surface));
-    color: var(--bad);
+    color: var(--bad-text);
     padding: 8px 24px;
     display: flex;
     justify-content: space-between;

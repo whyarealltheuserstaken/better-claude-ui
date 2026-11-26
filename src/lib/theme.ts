@@ -237,6 +237,17 @@ export function adjustedKeys(theme: Theme): (keyof ThemeColors)[] {
   return (["text", "muted", "accentInk", "gateInk"] as const).filter((key) => d[key] !== theme.colors[key]);
 }
 
+/**
+ * The adjusted colours that were unreadable on the theme's own flat colours, so worth telling the author.
+ * Small shifts made only for text over glass are left out.
+ */
+export function failingKeys(theme: Theme): (keyof ThemeColors)[] {
+  const k = theme.colors;
+  const flat = [k.bg, k.surface, k.raised];
+  const on: Partial<Record<keyof ThemeColors, string[]>> = { text: flat, muted: flat, accentInk: [k.accent], gateInk: [k.gate] };
+  return adjustedKeys(theme).filter((key) => on[key]!.some((under) => contrast(k[key], under) < 4.5));
+}
+
 const FONTS: Record<FontKind, string> = {
   system: '"Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", sans-serif',
   mono: '"Cascadia Code", "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace',

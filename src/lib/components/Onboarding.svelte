@@ -1,9 +1,11 @@
 <script lang="ts">
   import { TIERS, type Tier } from "../tier";
+  import Backdrop from "./Backdrop.svelte";
   let { ondone }: { ondone: (tier: Tier) => void } = $props();
   let pick = $state<Tier>("beginner");
 </script>
 
+<Backdrop waiting={false} />
 <main>
   <div class="card">
     <h1>Welcome to BetterClaudeUI</h1>
@@ -14,7 +16,7 @@
         <span><strong>{t.label}</strong><small>{t.blurb}</small></span>
       </label>
     {/each}
-    <button class="go" onclick={() => ondone(pick)}>Get started</button>
+    <button class="btn btn-primary go" onclick={() => ondone(pick)}>Get started</button>
     <p class="fine">Unofficial community project, not affiliated with Anthropic. It runs the Claude Code CLI you already have installed and logged in.</p>
   </div>
 </main>
@@ -28,6 +30,6 @@
   .tier.on { border-color: var(--accent); }
   .tier span { display: flex; flex-direction: column; }
   small { color: var(--muted); }
-  .go { margin-top: 10px; width: 100%; background: var(--accent); color: var(--accent-ink); border: 0; border-radius: var(--radius); padding: 11px; font-weight: 600; }
+  .go { margin-top: 10px; width: 100%; min-height: 40px; }
   .fine { color: var(--muted); font-size: 12.5px; margin-top: 16px; }
 </style>

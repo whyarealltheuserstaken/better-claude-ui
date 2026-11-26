@@ -277,7 +277,7 @@ try {
     await panel.getByRole("alert").waitFor();
     expect(/doesn't look like a chat export/.test(await panel.getByRole("alert").innerText()), "expected a clear error for a junk file");
     step("junk file refused with a clear message");
-    await panel.locator("button.x").click();
+    await panel.getByRole("button", { name: "Close", exact: true }).click();
 
     // 5. Filter, open (read-only), and search by content.
     const filter = page.getByLabel("Filter conversations");
@@ -296,7 +296,8 @@ try {
     // 6. Export everything, then check the files on disk.
     await pick("dir", join(dataInbox, "out"));
     await page.getByRole("button", { name: "Settings", exact: true }).click();
-    const settings = page.getByRole("dialog", { name: "Settings" });
+    await page.getByRole("navigation", { name: "Settings categories" }).getByRole("button", { name: "Your data" }).click();
+    const settings = page.locator("section.main");
     await settings.getByRole("button", { name: "Export all my data…" }).click();
     await settings.getByText(/Exported 4 conversations/).waitFor();
     const folders = fsx.readdirSync(join(dataInbox, "out"));
@@ -311,7 +312,7 @@ try {
     const backupText = fsx.readFileSync(join(ex, "backup.json"), "utf8");
     expect(!/private@example\.com/.test(backupText), "account details must not be in the export");
     step(`export: ${folders[0]} with backup.json, universal.json, ${mds.length} markdown files, README.txt`);
-    await settings.getByRole("button", { name: "Close settings" }).click();
+    await settings.getByRole("button", { name: "Back" }).click();
 
     // 7. Importing that export folder back must not duplicate anything.
     await page.getByRole("button", { name: "Import…" }).click();
@@ -372,13 +373,17 @@ try {
       return c;
     });
     try {
-      const settings = page.getByRole("dialog", { name: "Settings" });
-      const openSettings = async () => { if (!(await settings.isVisible().catch(() => false))) { await page.getByRole("button", { name: "Settings", exact: true }).click(); await settings.waitFor(); } };
+      const settings = page.locator("section.main");
+      const categories = page.getByRole("navigation", { name: "Settings categories" });
+      const openSettings = async () => {
+        if (!(await categories.isVisible().catch(() => false))) await page.getByRole("button", { name: "Settings", exact: true }).click();
+        await categories.getByRole("button", { name: "Updates" }).click();
+      };
       const check = async () => {
         await openSettings();
         await settings.getByRole("button", { name: "Check for updates" }).click();
-        await page.waitForFunction(() => { const t = document.querySelector(".updstatus")?.textContent ?? ""; return t && !t.startsWith("Checking"); });
-        return (await settings.locator(".updstatus").innerText()).trim();
+        await page.waitForFunction(() => { const t = document.querySelector("p.status")?.textContent ?? ""; return t && !t.startsWith("Checking"); });
+        return (await settings.locator("p.status").innerText()).trim();
       };
       const panel = page.getByRole("dialog", { name: "App update" });
       const expect = (cond, msg) => { if (!cond) throw new Error(msg); };
@@ -438,7 +443,7 @@ try {
         expect(/signed for version 0\.1\.0 but the update endpoint announced version 0\.1\.1/.test(detail), "replay: expected the signed-version mismatch, got: " + detail);
         expect((await panel.getByRole("button", { name: "Install and restart" }).count()) === 0, "replay: Install must not be offered");
         step("REPLAY of an older genuine, validly signed installer announced as newer -> rejected (signed-version mismatch)");
-        await panel.locator("button.x").click();
+        await panel.getByRole("button", { name: "Close", exact: true }).click();
       }
 
       // 3. Tampered bytes and a wrong signing key must be rejected at download, never installed.
@@ -457,7 +462,7 @@ try {
         step(bad + " -> " + msg);
         expect(/couldn't be verified/.test(msg) && /not installed/.test(msg), bad + ": expected a verification failure message");
         expect((await panel.getByRole("button", { name: "Install and restart" }).count()) === 0, bad + ": Install must not be offered");
-        await panel.locator("button.x").click();
+        await panel.getByRole("button", { name: "Close", exact: true }).click();
       }
 
       // 4. Broken servers produce friendly messages and never break the app.
@@ -473,7 +478,7 @@ try {
       expect(/internet connection/.test(t), "offline: unexpected message: " + t);
 
       // The app is still fully usable afterwards.
-      await settings.getByRole("button", { name: "Close settings" }).click();
+      await settings.getByRole("button", { name: "Back" }).click();
       await page.getByRole("heading", { name: "Home" }).waitFor();
       step("app still usable after every failure");
     } finally {
@@ -529,8 +534,8 @@ try {
       await page.keyboard.press("Control+k");
       await page.getByLabel("Search commands").fill("projects");
       await page.keyboard.press("Enter");
-      const dlg = page.getByRole("dialog", { name: "Projects" });
-      await dlg.waitFor();
+      const dlg = page.locator("section.main");
+      await dlg.getByRole("button", { name: "+ New project" }).click(); // never edit a project the test did not create
       await dlg.getByLabel("Name").fill("E2E Project");
       await dlg.getByLabel("Instructions").fill("Always end every reply with the exact word BANANAPHONE on its own line.");
       await dlg.getByRole("button", { name: "Create project" }).click();
@@ -617,7 +622,7 @@ try {
       step("tools exposed to Chat: " + JSON.stringify(tools));
       if (!tools || tools.length !== 2 || !tools.includes("WebSearch") || !tools.includes("WebFetch")) throw new Error("Chat is not locked down to web tools: " + JSON.stringify(tools));
 
-      await page.getByRole("button", { name: "Export" }).click();
+      await page.getByRole("button", { name: "Export this conversation" }).click();
       await page.getByText("Conversation copied as Markdown").waitFor();
       step("export copied the conversation");
     } finally {
@@ -665,8 +670,8 @@ try {
       await page.getByRole("button", { name: "Send" }).waitFor();
       step("first turn done (capabilities now reported)");
       await page.getByRole("button", { name: "Capabilities" }).click();
-      const dlg = page.getByRole("dialog", { name: "Capabilities" });
-      await dlg.waitFor();
+      const dlg = page.locator("section.main");
+      await dlg.getByRole("tab", { name: /Skills/ }).waitFor();
       const tabsText = (await dlg.getByRole("tab").allInnerTexts()).join(" | ");
       step("capabilities tabs: " + tabsText);
       await dlg.getByRole("tab", { name: /Skills/ }).click();
@@ -676,11 +681,10 @@ try {
       await dlg.getByRole("button", { name: "Show plugin details" }).click();
       await dlg.locator("pre.out").waitFor({ timeout: 60000 });
       step("claude plugin list output: " + (await dlg.locator("pre.out").innerText()).split("\n")[0].slice(0, 60));
-      await dlg.getByRole("button", { name: "Close" }).click();
+      await dlg.getByRole("button", { name: "Back" }).click();
 
-      await page.getByRole("button", { name: "Instructions and settings" }).click();
-      const ed = page.getByRole("dialog", { name: "Instructions and settings" });
-      await ed.waitFor();
+      await page.getByRole("button", { name: "Instructions", exact: true }).click();
+      const ed = page.locator("section.main");
       await ed.getByRole("tab", { name: "Project instructions" }).click();
       const ta = ed.getByLabel("Project instructions");
       await ta.fill("# E2E marker\nAlways answer in haiku.");

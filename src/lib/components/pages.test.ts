@@ -14,6 +14,7 @@ vi.mock("../ipc", () => ({
 import ProjectsPanel from "./ProjectsPanel.svelte";
 import CapabilitiesPanel from "./CapabilitiesPanel.svelte";
 import EditorPanel from "./EditorPanel.svelte";
+import ArchivePage from "./ArchivePage.svelte";
 
 const project = { id: "p1", name: "Marketing site", instructions: "Be brief.", cwd: null };
 const caps = { version: "2.1.0", mcp_servers: [{ name: "github", status: "connected" }], skills: ["review"], agents: [], plugins: [], tools: ["Read"], slash_commands: [] };
@@ -103,5 +104,15 @@ describe("Instructions page", () => {
     await ready();
     expect(box().value).toBe("global draft");
     await fireEvent.click(screen.getByRole("button", { name: "Revert" }));
+  });
+});
+
+describe("Archive page", () => {
+  test("leaves the title to the toolbar and keeps Import reachable", async () => {
+    const onimport = vi.fn();
+    render(ArchivePage, { entries: [], viewing: null, onopen: () => {}, onback: () => {}, ondelete: () => {}, oncontinue: () => {}, onimport, oncopy: () => {}, onpreview: () => {} });
+    expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
+    await fireEvent.click(screen.getByRole("button", { name: "Import data" }));
+    expect(onimport).toHaveBeenCalled();
   });
 });

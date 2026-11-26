@@ -1,6 +1,7 @@
 <script lang="ts">
   import { type ImportOptions, type ImportResult, type Inspection, defaultOptions, nothingSelected, summarizeResult } from "../exchange";
   import { dateLabel } from "../archive";
+  import Dialog from "../ui/Dialog.svelte";
 
   let {
     pickFile,
@@ -62,19 +63,14 @@
   const blocked = $derived(phase === "inspecting" || phase === "importing");
 </script>
 
-<div class="scrim" role="presentation" onclick={() => !blocked && onclose()} onkeydown={(e) => e.key === "Escape" && !blocked && onclose()}>
-  <div class="panel" role="dialog" aria-modal="true" aria-label="Import data" tabindex="-1" onclick={(e) => e.stopPropagation()} onkeydown={() => {}}>
-    <header>
-      <h2>Import data</h2>
-      {#if !blocked}<button class="x" onclick={onclose} aria-label="Close">×</button>{/if}
-    </header>
+<Dialog label="Import data" closable={!blocked} {onclose}>
 
     {#if phase === "choose" || phase === "error"}
       {#if phase === "error"}<p class="err" role="alert">{error}</p>{/if}
       <p>Bring conversations, projects and settings from another assistant, or restore a BetterClaudeUI backup.</p>
       <div class="row">
-        <button class="primary" onclick={() => choose("file")}>Choose a file…</button>
-        <button onclick={() => choose("folder")}>Choose a folder…</button>
+        <button class="btn btn-primary" onclick={() => choose("file")}>Choose a file…</button>
+        <button class="btn" onclick={() => choose("folder")}>Choose a folder…</button>
       </div>
       <details open>
         <summary>Where do I get an export?</summary>
@@ -108,8 +104,8 @@
         {#if info.presets > 0}<small class="sub">{info.presets} agent team{info.presets === 1 ? "" : "s"} come along with settings.</small>{/if}
       </fieldset>
       <div class="row">
-        <button class="primary" disabled={nothingSelected(options, info)} onclick={doImport}>Import</button>
-        <button onclick={() => (phase = "choose")}>Choose a different file</button>
+        <button class="btn btn-primary" disabled={nothingSelected(options, info)} onclick={doImport}>Import</button>
+        <button class="btn" onclick={() => (phase = "choose")}>Choose a different file</button>
       </div>
     {:else if phase === "importing"}
       <p role="status">Importing…</p>
@@ -117,24 +113,15 @@
       <p class="ok" role="status">Done.</p>
       <ul>{#each lines as l}<li>{l}</li>{/each}</ul>
       <div class="row">
-        <button class="primary" onclick={() => { onclose(); onopenarchive(); }}>Open Archive</button>
-        <button onclick={onclose}>Close</button>
+        <button class="btn btn-primary" onclick={() => { onclose(); onopenarchive(); }}>Open Archive</button>
+        <button class="btn" onclick={onclose}>Done</button>
       </div>
     {/if}
-  </div>
-</div>
+</Dialog>
 
 <style>
-  .scrim { position: fixed; inset: 0; background: rgb(0 0 0 / 0.5); display: grid; place-items: center; z-index: 12; }
-  .panel { width: min(600px, 94vw); max-height: 90vh; overflow: auto; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 18px 22px; }
-  header { display: flex; justify-content: space-between; align-items: center; }
-  h2 { margin: 0; font-size: 18px; }
-  .x { background: none; border: 0; color: var(--muted); font-size: 22px; }
   .sub, small { color: var(--muted); font-size: 12.5px; }
   .row { display: flex; gap: 10px; flex-wrap: wrap; margin: 12px 0; }
-  button { background: var(--raised); color: var(--text); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 6px 14px; }
-  button.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; font-weight: 600; }
-  button:disabled { opacity: 0.5; }
   .card { background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 14px; margin: 10px 0; }
   .samples { margin: 6px 0 0; padding-left: 18px; font-size: 13px; }
   .warns { margin: 6px 0; padding: 8px 8px 8px 26px; background: color-mix(in srgb, var(--gate) 12%, var(--surface)); border-radius: var(--radius-sm); font-size: 13px; }
@@ -143,6 +130,6 @@
   fieldset label { display: block; padding: 3px 0; }
   .help { padding-left: 18px; font-size: 13px; }
   code { font-family: var(--mono); background: var(--raised); padding: 0 4px; border-radius: 4px; }
-  .err { color: var(--bad); }
-  .ok { color: var(--ok); font-weight: 600; }
+  .err { color: var(--bad-text); }
+  .ok { color: var(--ok-text); font-weight: 600; }
 </style>

@@ -52,6 +52,7 @@
       e.preventDefault();
       run(shown[sel]);
     } else if (e.key === "Escape") {
+      e.stopPropagation(); // a dialog underneath must not close as well
       onclose();
     }
   }
@@ -77,7 +78,7 @@
 
 <style>
   .scrim { position: fixed; inset: 0; background: rgb(0 0 0 / 0.45); display: flex; justify-content: center; align-items: flex-start; padding-top: 14vh; z-index: 20; }
-  .box { width: min(560px, 92vw); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); box-shadow: 0 20px 60px rgb(0 0 0 / 0.4); overflow: hidden; }
+  .box { width: min(560px, 92vw); background: var(--surface); border: 1px solid var(--line); border-radius: var(--float-radius); box-shadow: 0 24px 70px rgb(0 0 0 / 0.45); overflow: hidden; }
   input { width: 100%; background: none; border: 0; border-bottom: 1px solid var(--line); outline: none; color: var(--text); font: inherit; font-size: 15px; padding: 14px 16px; }
   ul { list-style: none; margin: 0; padding: 6px; max-height: 340px; overflow: auto; }
   li button { width: 100%; display: flex; justify-content: space-between; gap: 12px; text-align: left; background: none; border: 0; border-radius: var(--radius-sm); padding: 8px 10px; color: var(--text); }

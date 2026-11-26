@@ -36,10 +36,7 @@
 
 <div class="archive">
   <aside aria-label="Archive">
-    <header>
-      <h1>Archive</h1>
-      <button onclick={onimport}>Import…</button>
-    </header>
+    {#if entries.length > 0}<header><button onclick={onimport}>Import…</button></header>{/if}
     {#if entries.length === 0}
       <p class="empty">Nothing here yet. Import conversations from Claude.ai, ChatGPT or another BetterClaudeUI backup, and they'll appear here to read, search and continue.</p>
       <button class="primary" onclick={onimport}>Import data</button>
@@ -89,8 +86,7 @@
   .archive { display: grid; grid-template-columns: 320px 1fr; flex: 1; min-height: 0; }
   @media (max-width: 800px) { .archive { grid-template-columns: 1fr; } .viewer { display: none; } }
   aside { border-right: 1px solid var(--line); padding: 14px; display: flex; flex-direction: column; gap: 10px; overflow: hidden; }
-  header { display: flex; justify-content: space-between; align-items: center; }
-  h1 { margin: 0; font-size: 20px; letter-spacing: -0.02em; }
+  header { display: flex; justify-content: flex-end; }
   input { background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 7px 10px; font: inherit; }
   ul { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; }
   .item { width: 100%; text-align: left; background: none; border: 0; border-radius: var(--radius-sm); padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; color: var(--text); }
@@ -99,14 +95,14 @@
   .m { color: var(--muted); font-size: 12px; }
   .empty { color: var(--muted); padding: 6px 4px; }
   .chips { display: flex; gap: 6px; flex-wrap: wrap; }
-  .chips button { background: none; border: 1px solid var(--line); border-radius: 999px; padding: 1px 10px; font-size: 12px; color: var(--muted); }
-  .chips button.on { border-color: var(--accent); color: var(--accent); }
+  .chips button { min-height: 28px; background: none; border-color: var(--line); padding: 1px 12px; font-size: 12px; color: var(--muted); }
+  .chips button.on { border-color: var(--accent); color: var(--accent-text); }
   .viewer { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
   .bar { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 10px 20px; border-bottom: 1px solid var(--line); }
   .acts { display: flex; gap: 8px; align-items: center; }
   .placeholder { margin: auto; color: var(--muted); }
-  button { background: var(--raised); color: var(--text); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 5px 12px; }
+  button { min-height: 30px; background: var(--fill); color: var(--text); border: 1px solid transparent; border-radius: var(--capsule); padding: 4px 14px; }
   button.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; font-weight: 600; }
-  button.danger { color: var(--bad); }
+  button.danger { color: var(--bad-text); }
   .back { background: none; border: 0; color: var(--muted); font-size: 20px; padding: 0 8px; }
 </style>
