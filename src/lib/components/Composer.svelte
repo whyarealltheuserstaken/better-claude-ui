@@ -3,6 +3,8 @@
   import { completeCommand, slashMatches, slashQuery } from "../slash";
   import { type Dictation, createDictation, dictationSupported, mergeTranscript } from "../dictation";
   import type { SessionStatus } from "../types";
+  import type { Snippet } from "svelte";
+  import Icon from "../ui/Icon.svelte";
 
   let {
     status,
@@ -11,7 +13,9 @@
     descriptions = {},
     onsend,
     oninterrupt,
+    controls,
   }: {
+    controls?: Snippet;
     status: SessionStatus;
     glyph?: string;
     commands?: string[];
@@ -125,7 +129,7 @@
 </script>
 
 <div
-  class="composer"
+  class="composer glass"
   class:dragging
   role="group"
   aria-label="Composer"
@@ -159,11 +163,6 @@
   {/if}
   <div class="row">
     {#if glyph}<span class="glyph" aria-hidden="true">{glyph}</span>{/if}
-    {#if canDictate}
-      <button class="attach" class:live={listening} onclick={toggleVoice} disabled={disabled} aria-pressed={listening} aria-label={listening ? "Stop dictation" : "Dictate with your voice"} title={listening ? "Stop dictation" : "Dictate with your voice"}>{listening ? "■" : "🎤"}</button>
-    {/if}
-    <button class="attach" onclick={() => picker?.click()} disabled={disabled} aria-label="Attach files" title="Attach images, PDFs or text files (or paste or drop them)">+</button>
-    <input bind:this={picker} type="file" multiple hidden accept="image/*,.pdf,text/*,.md,.json,.js,.ts,.tsx,.jsx,.py,.rs,.go,.java,.c,.cpp,.cs,.rb,.php,.html,.css,.svelte,.yaml,.yml,.toml,.sh,.csv,.log,.xml,.sql" onchange={(e) => { void addFiles([...(e.currentTarget.files ?? [])]); e.currentTarget.value = ""; }} />
     <textarea
       bind:value={text}
       onkeydown={onkey}
@@ -171,31 +170,42 @@
       {disabled}
       rows="2"
       aria-label="Message"
-      placeholder={disabled ? "This session has ended. Start a new one." : "Ask Claude to do something…  (Enter to send, Shift+Enter for a new line)"}
+      placeholder={disabled ? "This session has ended. Start a new one." : "Ask Claude to do something…"}
     ></textarea>
+  </div>
+  <div class="tools">
+    <button class="btn-icon" onclick={() => picker?.click()} disabled={disabled} aria-label="Attach files" title="Attach images, PDFs or text files (or paste or drop them)"><Icon name="paperclip" /></button>
+    <input bind:this={picker} type="file" multiple hidden accept="image/*,.pdf,text/*,.md,.json,.js,.ts,.tsx,.jsx,.py,.rs,.go,.java,.c,.cpp,.cs,.rb,.php,.html,.css,.svelte,.yaml,.yml,.toml,.sh,.csv,.log,.xml,.sql" onchange={(e) => { void addFiles([...(e.currentTarget.files ?? [])]); e.currentTarget.value = ""; }} />
+    {#if canDictate}
+      <button class="btn-icon" class:live={listening} onclick={toggleVoice} disabled={disabled} aria-pressed={listening} aria-label={listening ? "Stop dictation" : "Dictate with your voice"} title={listening ? "Stop dictation" : "Dictate with your voice"}><Icon name={listening ? "stop" : "mic"} /></button>
+    {/if}
+    {@render controls?.()}
+    <span class="hint">Enter to send, Shift+Enter for a new line</span>
     {#if running}
-      <button class="stop" onclick={oninterrupt} aria-label="Stop (Esc)">Stop</button>
+      <button class="go stop" onclick={oninterrupt} aria-label="Stop (Esc)" title="Stop (Esc)"><Icon name="stop" size={14} /></button>
     {:else}
-      <button class="send" onclick={submit} disabled={!canSend}>Send</button>
+      <button class="go send" onclick={submit} disabled={!canSend} aria-label="Send" title="Send"><Icon name="send" /></button>
     {/if}
   </div>
   {#if problem}<p class="problem" role="alert">{problem}</p>{/if}
 </div>
 
 <style>
-  .composer { position: relative; padding: 10px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); }
+  .composer { position: relative; container-type: inline-size; padding: 10px 12px 8px; border-radius: var(--float-radius); }
   .composer:focus-within { border-color: var(--accent); }
-  .composer.dragging { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
-  .row { display: flex; gap: 10px; align-items: flex-end; }
-  .glyph { color: var(--accent); font-weight: 700; padding: 4px 0 4px 4px; }
+  .composer.dragging { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--card)); }
+  .row { display: flex; gap: 8px; align-items: flex-start; }
+  .glyph { color: var(--accent-text); font-weight: 700; padding: 4px 0 4px 4px; }
   textarea { flex: 1; resize: none; max-height: 220px; background: none; border: 0; outline: none; color: var(--text); font: inherit; padding: 4px 6px; }
-  button { border-radius: var(--radius); border: 0; padding: 8px 18px; font-weight: 600; }
+  textarea::placeholder { color: var(--muted); }
+  .tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .live { background: var(--bad); color: #fff; }
+  .hint { flex: 1; min-width: 0; text-align: end; color: var(--muted); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  @container (max-width: 560px) { .hint { display: none; } }
+  .go { display: grid; place-items: center; flex: none; margin-inline-start: auto; width: 34px; height: 34px; padding: 0; border: 1px solid transparent; border-radius: var(--capsule); }
   .send { background: var(--accent); color: var(--accent-ink); }
   .send:disabled { opacity: 0.4; cursor: default; }
-  .stop { background: var(--raised); color: var(--text); border: 1px solid var(--line); }
-  .attach { background: var(--raised); color: var(--text); padding: 6px 12px; font-size: 16px; line-height: 1; border: 1px solid var(--line); }
-  .attach:disabled { opacity: 0.4; }
-  .attach.live { background: var(--bad); color: #fff; border-color: transparent; }
+  .stop { background: var(--fill); color: var(--text); border-color: var(--line); }
   .chips { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
   .chip { display: flex; align-items: center; gap: 6px; background: var(--raised); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 3px 4px 3px 6px; font-size: 12.5px; max-width: 240px; }
   .chip img { width: 22px; height: 22px; object-fit: cover; border-radius: 3px; }

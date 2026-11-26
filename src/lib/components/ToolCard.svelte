@@ -1,9 +1,10 @@
 <script lang="ts">
   import { diffLines, summarizeTool, truncateLines } from "../tools";
   import type { ChatItem } from "../types";
+  import Icon from "../ui/Icon.svelte";
 
   type Tool = Extract<ChatItem, { kind: "tool" }>;
-  let { item, maxLines = 200, diffs = false }: { item: Tool; maxLines?: number; diffs?: boolean } = $props();
+  let { item, maxLines = 200, diffs = false, waiting = false }: { item: Tool; maxLines?: number; diffs?: boolean; waiting?: boolean } = $props();
 
   let open = $state(false);
   let showAll = $state(false);
@@ -20,8 +21,8 @@
   <button class="head" aria-expanded={open} onclick={() => (open = !open)}>
     <span class="dot" aria-hidden="true"></span>
     <span class="summary">{summary}</span>
-    <span class="state">{item.status === "running" ? "running" : item.status === "error" ? "failed" : "done"}</span>
-    <span class="chev" aria-hidden="true">{open ? "▾" : "▸"}</span>
+    <span class="state" class:waiting>{waiting ? "Waiting for you" : item.status === "running" ? "running" : item.status === "error" ? "failed" : "done"}</span>
+    <span class="chev"><Icon name={open ? "chevronDown" : "chevronRight"} size={14} /></span>
   </button>
   {#if open}
     <div class="body">
@@ -155,4 +156,6 @@
     padding-left: 14px;
     border-radius: 0;
   }
+  .state.waiting { color: var(--gate-text); font-weight: 650; }
+  .chev { display: flex; }
 </style>

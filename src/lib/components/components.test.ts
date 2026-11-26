@@ -110,3 +110,27 @@ describe("Message code blocks", () => {
     expect(screen.queryByRole("button", { name: "Preview" })).toBeNull();
   });
 });
+
+describe("PermissionPrompt safety", () => {
+  const request = { session_id: "s", request_id: "r1", tool: "Write", input: { file_path: "a.txt" }, description: "a.txt", tool_use_id: "t" };
+
+  test("the order is Deny, Always allow, Allow", () => {
+    const { container } = render(PermissionPrompt, { request, onresolve: () => {} });
+    expect([...container.querySelectorAll("button")].map((b) => b.textContent?.trim())).toEqual(["Deny", "Always allow Write", "Allow"]);
+  });
+
+  test("nothing is focused and no single key approves", async () => {
+    const onresolve = vi.fn();
+    const { container } = render(PermissionPrompt, { request, onresolve });
+    for (const b of container.querySelectorAll("button")) expect(document.activeElement).not.toBe(b);
+    for (const key of ["Enter", "a", "y", " "]) await fireEvent.keyDown(document.body, { key });
+    expect(onresolve).not.toHaveBeenCalled();
+  });
+});
+
+describe("ToolCard waiting", () => {
+  test("a tool waiting for permission says so", () => {
+    render(ToolCard, { item: { ...tool(null), status: "running" }, waiting: true });
+    expect(screen.getByText("Waiting for you")).toBeTruthy();
+  });
+});

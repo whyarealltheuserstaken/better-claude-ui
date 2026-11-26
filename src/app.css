@@ -146,18 +146,25 @@ button {
   border: 1px solid var(--line);
   padding: 0.3em 0.7em;
 }
+/* Light themes need darker code colours to stay readable. */
+:root[data-scheme="light"] {
+  --hl-keyword: #7b2aa8;
+  --hl-string: #12693a;
+  --hl-number: #8a5200;
+  --hl-title: #1a54a8;
+}
 .hljs-keyword,
 .hljs-selector-tag,
 .hljs-built_in {
-  color: #c4a6ff;
+  color: var(--hl-keyword, #c4a6ff);
 }
 .hljs-string,
 .hljs-attr {
-  color: #8fd6a4;
+  color: var(--hl-string, #8fd6a4);
 }
 .hljs-number,
 .hljs-literal {
-  color: #f2b84b;
+  color: var(--hl-number, #f2b84b);
 }
 .hljs-comment {
   color: var(--muted);
@@ -165,7 +172,7 @@ button {
 }
 .hljs-title,
 .hljs-function {
-  color: #7fb4ff;
+  color: var(--hl-title, #7fb4ff);
 }
 .hljs-addition {
   color: var(--ok);

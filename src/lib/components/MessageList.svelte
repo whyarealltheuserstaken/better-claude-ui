@@ -7,9 +7,10 @@
     items,
     pageSize = 150,
     diffs = false,
+    waitingIds = new Set<string>(),
     oncopy,
     onpreview,
-  }: { items: ChatItem[]; pageSize?: number; diffs?: boolean; oncopy?: (text: string) => void; onpreview?: (code: string, lang: string) => void } = $props();
+  }: { items: ChatItem[]; pageSize?: number; diffs?: boolean; waitingIds?: Set<string>; oncopy?: (text: string) => void; onpreview?: (code: string, lang: string) => void } = $props();
 
   // Long sessions render only the most recent window; older items load on demand.
   let extra = $state(0);
@@ -49,7 +50,7 @@
       <button class="earlier" onclick={() => (extra += pageSize)}>Show {Math.min(start, pageSize)} earlier messages</button>
     {/if}
     {#each visible as item (item.id)}
-      <div data-item={item.id}><Message {item} {diffs} {oncopy} {onpreview} /></div>
+      <div data-item={item.id}><Message {item} {diffs} waiting={waitingIds.has(item.id)} {oncopy} {onpreview} /></div>
     {/each}
   </div>
 </div>
