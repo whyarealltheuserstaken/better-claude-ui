@@ -30,7 +30,7 @@
   import type { PendingAttachment } from "$lib/attachments";
   import type { Mode } from "$lib/types";
   import SettingsPage from "$lib/components/SettingsPage.svelte";
-  import { CATEGORIES, cleanCategory, escapeGoesBack } from "$lib/settingsNav";
+  import { CATEGORIES, cleanCategory, escapeGoesBack, pageAllowed } from "$lib/settingsNav";
   import Composer from "$lib/components/Composer.svelte";
   import MessageList from "$lib/components/MessageList.svelte";
   import PermissionPrompt from "$lib/components/PermissionPrompt.svelte";
@@ -76,16 +76,16 @@
       { id: "new-chat", label: "New chat", group: "Start", run: () => { app.setMode("chat"); void app.newSession(); } },
       { id: "new-code", label: "New coding session", group: "Start", keywords: "project folder", run: () => { app.setMode("code"); void app.newSession(); } },
       { id: "teams", label: "Agent teams", group: "Start", keywords: "preset research coordinator review", run: () => (app.showPresets = true) },
-      { id: "projects", label: "Projects", group: "App", keywords: "instructions manage", run: () => (app.showProjects = true) },
+      { id: "projects", label: "Projects", group: "App", keywords: "instructions manage", run: () => app.openPage("projects") },
       { id: "archive", label: "Archive", group: "Go to", keywords: "imported conversations restored", run: () => app.go("archive") },
       { id: "export", label: "Export all my data", group: "Your data", keywords: "backup save migrate", run: () => void app.exportAll() },
       { id: "import", label: "Import data", group: "Your data", keywords: "restore claude chatgpt grok migrate", run: () => (app.showImport = true) },
       { id: "settings", label: "Settings", group: "App", keywords: "preferences appearance tier", run: () => app.openPage("settings") },
     ];
-    if (app.tier !== "beginner") {
+    if (pageAllowed("capabilities", app.tier)) {
       items.push(
-        { id: "caps", label: "Capabilities", group: "App", keywords: "mcp skills plugins tools servers", run: () => (app.showCaps = true) },
-        { id: "editor", label: "Instructions and settings", group: "App", keywords: "claude.md settings.json", run: () => (app.showEditor = true) },
+        { id: "caps", label: "Capabilities", group: "App", keywords: "mcp skills plugins tools servers", run: () => app.openPage("capabilities") },
+        { id: "editor", label: "Instructions and settings", group: "App", keywords: "claude.md settings.json", run: () => app.openPage("instructions") },
       );
     }
     if (active && active.items.length > 0) {
@@ -161,6 +161,9 @@
     if (app.view === "usage") return { title: "Usage", subtitle: "Tokens and estimated cost on this computer" };
     if (app.view === "archive") return { title: "Archive", subtitle: "Imported conversations" };
     if (app.view === "settings") return { title: "Settings", subtitle: CATEGORIES.find((c) => c.id === cleanCategory(app.config.settings_category))?.label ?? "" };
+    if (app.view === "projects") return { title: "Projects", subtitle: "Standing instructions and folders" };
+    if (app.view === "capabilities") return { title: "Capabilities", subtitle: "MCP servers, skills, agents, plugins and tools" };
+    if (app.view === "instructions") return { title: "Instructions", subtitle: "Instruction and settings files" };
     if (!app.active || !app.activeMeta) return { title: app.mode === "chat" ? "Chat" : "Code", subtitle: "" };
     return { title: app.activeMeta.title, subtitle: app.activeMeta.mode === "chat" ? "No tools in Chat" : (app.active.cwd ?? app.activeMeta.cwd ?? "") };
   });
@@ -226,7 +229,7 @@
         onhome={() => app.go("home")}
         onusage={() => app.go("usage")}
         onproject={(id) => void app.newSession({ projectId: id })}
-        onprojects={() => (app.showProjects = true)}
+        onprojects={() => app.openPage("projects")}
         onresume={(r) => app.resume(r)}
         onforget={(r) => app.forget(r)}
         onsettings={() => app.openPage("settings")}
@@ -234,8 +237,8 @@
         archiveCount={app.archive.length}
         onarchive={() => app.go("archive")}
         advancedTools={app.tier !== "beginner"}
-        oncaps={() => (app.showCaps = true)}
-        oneditor={() => (app.showEditor = true)}
+        oncaps={() => app.openPage("capabilities")}
+        oneditor={() => app.openPage("instructions")}
         onselect={(id) => app.select(id)}
         onnew={() => app.newSession()}
         onclose={(id) => app.close(id)}
@@ -290,7 +293,7 @@
             limitsPaused={app.limitsPaused}
             projects={app.projects}
             onproject={(id, mode) => { app.setMode(mode); void app.newSession({ projectId: id }); }}
-            onprojects={() => (app.showProjects = true)}
+            onprojects={() => app.openPage("projects")}
           />
         </div>
       {:else if app.view === "settings"}
@@ -309,6 +312,18 @@
           onsave={(patch) => app.updateConfig(patch)}
           onback={() => app.back()}
         />
+      {:else if app.view === "projects"}
+        <ProjectsPanel
+          projects={app.projects}
+          onsave={(list) => app.updateConfig({ projects: list })}
+          onstart={(p, mode) => { app.setMode(mode); void app.newSession({ projectId: p.id }); }}
+          onpick={pickFolder}
+          onback={() => app.back()}
+        />
+      {:else if app.view === "capabilities" && pageAllowed("capabilities", app.tier)}
+        <CapabilitiesPanel caps={app.active?.caps ?? null} run={(a) => ipc.runCli(a, app.activeMeta?.cwd ?? null)} onback={() => app.back()} />
+      {:else if app.view === "instructions" && pageAllowed("instructions", app.tier)}
+        <EditorPanel project={app.activeMeta?.mode === "code" ? (app.activeMeta.cwd ?? null) : null} advanced={app.tier === "advanced"} onback={() => app.back()} />
       {:else if app.view === "archive"}
         <ArchivePage
           entries={app.archive}
@@ -437,22 +452,7 @@
 {#if app.preview}
   <ArtifactPreview code={app.preview.code} lang={app.preview.lang} oncopy={(t) => app.copyText(t, "Code copied")} onclose={() => (app.preview = null)} />
 {/if}
-{#if app.showProjects}
-  <ProjectsPanel
-    projects={app.projects}
-    onsave={(list) => app.updateConfig({ projects: list })}
-    onstart={(p, mode) => { app.showProjects = false; app.setMode(mode); void app.newSession({ projectId: p.id }); }}
-    onpick={pickFolder}
-    onclose={() => (app.showProjects = false)}
-  />
-{/if}
 {#if app.toast}<div class="toast" role="status">{app.toast}</div>{/if}
-{#if app.showCaps}
-  <CapabilitiesPanel caps={app.active?.caps ?? null} run={(a) => ipc.runCli(a, app.activeMeta?.cwd ?? null)} onclose={() => (app.showCaps = false)} />
-{/if}
-{#if app.showEditor}
-  <EditorPanel project={app.activeMeta?.mode === "code" ? (app.activeMeta.cwd ?? null) : null} advanced={app.tier === "advanced"} onclose={() => (app.showEditor = false)} />
-{/if}
 {#if app.showPresets}
   <PresetPicker presets={app.presets} advanced={app.tier === "advanced"} onstart={(p) => app.startPreset(p)} onclose={() => (app.showPresets = false)} />
 {/if}

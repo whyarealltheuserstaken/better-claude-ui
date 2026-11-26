@@ -1,5 +1,6 @@
 <script lang="ts">
   import { untrack } from "svelte";
+  import PageFrame from "./PageFrame.svelte";
   import { MAX_INSTRUCTIONS, type Project, newProjectId, remaining } from "../projects";
 
   let {
@@ -7,13 +8,13 @@
     onsave,
     onstart,
     onpick,
-    onclose,
+    onback,
   }: {
     projects: Project[];
     onsave: (list: Project[]) => void;
     onstart: (p: Project, mode: "chat" | "code") => void;
     onpick: () => Promise<string | null>;
-    onclose: () => void;
+    onback: () => void;
   } = $props();
 
   // The panel is mounted fresh each time it opens, so reading the initial list once is intended.
@@ -75,12 +76,7 @@
   }
 </script>
 
-<div class="scrim" role="presentation" onclick={onclose} onkeydown={(e) => e.key === "Escape" && onclose()}>
-  <div class="panel" role="dialog" aria-modal="true" aria-label="Projects" tabindex="-1" onclick={(e) => e.stopPropagation()} onkeydown={() => {}}>
-    <header>
-      <h2>Projects</h2>
-      <button class="x" onclick={onclose} aria-label="Close">×</button>
-    </header>
+<PageFrame {onback}>
     <p class="sub">A project remembers standing instructions (tone, rules, background) and, for coding, a folder. Every conversation you start from it follows them.</p>
     <div class="cols">
       <nav aria-label="Your projects">
@@ -109,15 +105,9 @@
         </div>
       </div>
     </div>
-  </div>
-</div>
+</PageFrame>
 
 <style>
-  .scrim { position: fixed; inset: 0; background: rgb(0 0 0 / 0.5); display: grid; place-items: center; z-index: 10; }
-  .panel { width: min(780px, 95vw); max-height: 90vh; overflow: auto; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 18px 22px; }
-  header { display: flex; justify-content: space-between; align-items: center; }
-  h2 { margin: 0; font-size: 18px; }
-  .x { background: none; border: 0; color: var(--muted); font-size: 22px; }
   .sub { color: var(--muted); font-size: 13px; }
   .cols { display: grid; grid-template-columns: 200px 1fr; gap: 18px; }
   @media (max-width: 640px) { .cols { grid-template-columns: 1fr; } }
@@ -132,8 +122,8 @@
   small { color: var(--muted); }
   .pick { display: flex; gap: 8px; }
   .row { display: flex; gap: 10px; flex-wrap: wrap; }
-  button { background: var(--raised); color: var(--text); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 6px 14px; }
+  button { min-height: 30px; background: var(--fill); color: var(--text); border: 1px solid transparent; border-radius: var(--capsule); padding: 4px 14px; }
   button.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; font-weight: 600; }
-  button.danger { color: var(--bad); margin-left: auto; }
-  .err { color: var(--bad); margin: 0; }
+  button.danger { color: var(--bad-text); margin-left: auto; }
+  .err { color: var(--bad-text); margin: 0; }
 </style>

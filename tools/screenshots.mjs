@@ -48,6 +48,9 @@ for (const theme of themes) {
       await page.waitForTimeout(2500);
     });
     await step("usage", () => nav.getByRole("button", { name: "Usage" }).click());
+    await step("projects", () => nav.getByRole("button", { name: "Manage projects" }).click());
+    await step("capabilities", () => nav.getByRole("button", { name: "Capabilities" }).click());
+    await step("instructions", () => nav.getByRole("button", { name: "Instructions" }).click());
     await step("settings", () => nav.getByRole("button", { name: "Settings" }).click());
     const category = (name) => page.getByRole("navigation", { name: "Settings categories" }).getByRole("button", { name }).click();
     await step("settings-appearance", () => category("Appearance"));

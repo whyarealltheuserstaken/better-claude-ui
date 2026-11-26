@@ -1,15 +1,16 @@
 <script lang="ts">
+  import PageFrame from "./PageFrame.svelte";
   import { buildMcpAdd, buildMcpRemove, isPluginServer, type McpForm } from "../mcp";
   import type { Capabilities, CliOutput } from "../types";
 
   let {
     caps,
     run,
-    onclose,
+    onback,
   }: {
     caps: Capabilities | null;
     run: (args: string[]) => Promise<CliOutput>;
-    onclose: () => void;
+    onback: () => void;
   } = $props();
 
   type Tab = "mcp" | "skills" | "agents" | "plugins" | "tools";
@@ -69,12 +70,7 @@
   }
 </script>
 
-<div class="scrim" role="presentation" onclick={onclose} onkeydown={(e) => e.key === "Escape" && onclose()}>
-  <div class="panel" role="dialog" aria-modal="true" aria-label="Capabilities" tabindex="-1" onclick={(e) => e.stopPropagation()} onkeydown={() => {}}>
-    <header>
-      <h2>Capabilities</h2>
-      <button class="x" onclick={onclose} aria-label="Close">×</button>
-    </header>
+<PageFrame {onback}>
     {#if !caps}
       <p class="sub">Send your first message in a session: Claude reports its skills, tools and servers once it starts working. You can check your MCP servers any time.</p>
       <div class="actions"><button disabled={busy} onclick={() => exec(["mcp", "list"], "claude mcp list")}>Check server health</button></div>
@@ -138,19 +134,13 @@
       {#if output}<pre class="out">{output}</pre>{/if}
       <p class="sub foot">Claude Code {caps.version}</p>
     {/if}
-  </div>
-</div>
+</PageFrame>
 
 <style>
-  .scrim { position: fixed; inset: 0; background: rgb(0 0 0 / 0.5); display: grid; place-items: center; z-index: 10; }
-  .panel { width: min(680px, 94vw); max-height: 88vh; overflow: auto; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 18px 22px; }
-  header { display: flex; justify-content: space-between; align-items: center; }
-  h2 { margin: 0; font-size: 18px; }
-  .x { background: none; border: 0; color: var(--muted); font-size: 22px; }
   .sub { color: var(--muted); font-size: 13px; }
   .foot { margin-bottom: 0; }
   .tabs { display: flex; gap: 4px; flex-wrap: wrap; margin: 10px 0; border-bottom: 1px solid var(--line); }
-  .tabs button { background: none; border: 0; border-bottom: 2px solid transparent; padding: 6px 10px; color: var(--muted); }
+  .tabs button { background: none; border: 0; border-bottom: 2px solid transparent; border-radius: 0; padding: 6px 10px; color: var(--muted); }
   .tabs button.on { color: var(--text); border-bottom-color: var(--accent); }
   .n { font-size: 11px; color: var(--muted); }
   .rows { list-style: none; margin: 8px 0; padding: 0; }
@@ -168,11 +158,11 @@
   .form .wide { grid-column: 1 / -1; }
   input, select { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 6px 8px; font: inherit; }
   .search { width: 100%; }
-  button { background: var(--raised); color: var(--text); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 5px 12px; }
-  button.small { padding: 2px 10px; }
+  button { min-height: 30px; background: var(--fill); color: var(--text); border: 1px solid transparent; border-radius: var(--capsule); padding: 4px 14px; }
+  button.small { min-height: 28px; padding: 2px 10px; }
   button.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; font-weight: 600; align-self: end; }
   button:disabled { opacity: 0.5; }
   .actions { margin: 8px 0; }
-  .err { color: var(--bad); }
+  .err { color: var(--bad-text); }
   .out { max-height: 200px; overflow: auto; background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 8px; font: 12px/1.5 var(--mono); white-space: pre-wrap; }
 </style>

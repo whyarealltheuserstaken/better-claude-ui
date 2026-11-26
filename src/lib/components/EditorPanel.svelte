@@ -1,12 +1,18 @@
+<script module lang="ts">
+  // Unsaved text, kept while the app runs, so leaving the page never throws work away.
+  const drafts = new Map<string, string>();
+</script>
+
 <script lang="ts">
   import { onMount } from "svelte";
   import { ipc } from "../ipc";
+  import PageFrame from "./PageFrame.svelte";
 
   let {
     project,
     advanced,
-    onclose,
-  }: { project: string | null; advanced: boolean; onclose: () => void } = $props();
+    onback,
+  }: { project: string | null; advanced: boolean; onback: () => void } = $props();
 
   interface Tab {
     id: string;
@@ -34,17 +40,28 @@
   const tab = $derived(ALL.find((t) => t.id === current)!);
   const blocked = $derived(tab.needsProject && !project);
   const dirty = $derived(text !== saved);
+  const draftKey = (id: string) => `${id}\n${ALL.find((t) => t.id === id)!.needsProject ? (project ?? "") : ""}`;
+
+  function keepDraft() {
+    if (text === saved) drafts.delete(draftKey(current));
+    else drafts.set(draftKey(current), text);
+  }
+
+  function revert() {
+    text = saved;
+    keepDraft();
+  }
 
   async function load(id: string) {
     loading = true;
     error = note = null;
     try {
       const t = ALL.find((x) => x.id === id)!;
-      if (t.needsProject && !project) {
-        text = saved = "";
-      } else {
-        text = saved = await ipc.readConfigFile(id, project);
-      }
+      const disk = t.needsProject && !project ? "" : await ipc.readConfigFile(id, project);
+      if (id !== current) return; // another tab was picked while this one was loading
+      saved = disk;
+      text = drafts.get(draftKey(id)) ?? disk;
+      keepDraft();
     } catch (e) {
       error = String(e);
     } finally {
@@ -53,7 +70,6 @@
   }
 
   function choose(id: string) {
-    if (dirty && !confirm("Discard your unsaved changes?")) return;
     current = id;
     void load(id);
   }
@@ -63,6 +79,7 @@
     try {
       await ipc.writeConfigFile(current, project, text);
       saved = text;
+      keepDraft();
       note = "Saved. Applies to sessions you start next. The previous version was kept as a .bak file.";
     } catch (e) {
       error = String(e);
@@ -72,12 +89,7 @@
   onMount(() => void load(current));
 </script>
 
-<div class="scrim" role="presentation" onclick={() => (!dirty || confirm("Discard your unsaved changes?")) && onclose()} onkeydown={() => {}}>
-  <div class="panel" role="dialog" aria-modal="true" aria-label="Instructions and settings" tabindex="-1" onclick={(e) => e.stopPropagation()} onkeydown={() => {}}>
-    <header>
-      <h2>Instructions and settings</h2>
-      <button class="x" onclick={() => (!dirty || confirm("Discard your unsaved changes?")) && onclose()} aria-label="Close">×</button>
-    </header>
+<PageFrame {onback}>
     <div class="tabs" role="tablist">
       {#each tabs as t (t.id)}
         <button role="tab" aria-selected={current === t.id} class:on={current === t.id} onclick={() => choose(t.id)}>{t.label}</button>
@@ -87,34 +99,29 @@
     {#if blocked}
       <p class="sub">Open a Code session in a project folder to edit this file.</p>
     {:else}
-      <textarea bind:value={text} spellcheck="false" aria-label={tab.label} disabled={loading} rows="16" class:mono={tab.id.endsWith("settings")}></textarea>
+      <textarea bind:value={text} oninput={keepDraft} spellcheck="false" aria-label={tab.label} disabled={loading} rows="16" class:mono={tab.id.endsWith("settings")}></textarea>
       <div class="row">
         <button class="primary" disabled={!dirty || loading} onclick={save}>Save</button>
-        <button disabled={!dirty} onclick={() => (text = saved)}>Revert</button>
+        <button disabled={!dirty} onclick={revert}>Revert</button>
+        {#if dirty}<span class="sub">Not saved yet. Your text is kept here while the app is open.</span>{/if}
         {#if saved === "" && !dirty}<span class="sub">This file doesn't exist yet. Saving creates it.</span>{/if}
       </div>
     {/if}
     {#if error}<p class="err" role="alert">{error}</p>{/if}
     {#if note}<p class="ok" role="status">{note}</p>{/if}
-  </div>
-</div>
+</PageFrame>
 
 <style>
-  .scrim { position: fixed; inset: 0; background: rgb(0 0 0 / 0.5); display: grid; place-items: center; z-index: 10; }
-  .panel { width: min(720px, 94vw); max-height: 90vh; overflow: auto; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 18px 22px; }
-  header { display: flex; justify-content: space-between; align-items: center; }
-  h2 { margin: 0; font-size: 18px; }
-  .x { background: none; border: 0; color: var(--muted); font-size: 22px; }
   .tabs { display: flex; gap: 4px; flex-wrap: wrap; margin: 10px 0 4px; border-bottom: 1px solid var(--line); }
-  .tabs button { background: none; border: 0; border-bottom: 2px solid transparent; padding: 6px 10px; color: var(--muted); }
+  .tabs button { background: none; border: 0; border-bottom: 2px solid transparent; border-radius: 0; padding: 6px 10px; color: var(--muted); }
   .tabs button.on { color: var(--text); border-bottom-color: var(--accent); }
   .sub { color: var(--muted); font-size: 13px; }
   textarea { width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 10px; font: inherit; resize: vertical; }
   textarea.mono { font-family: var(--mono); font-size: 12.5px; }
-  .row { display: flex; gap: 10px; align-items: center; margin-top: 10px; }
-  button { background: var(--raised); color: var(--text); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 6px 14px; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+  button { min-height: 30px; background: var(--fill); color: var(--text); border: 1px solid transparent; border-radius: var(--capsule); padding: 4px 14px; }
   button.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; font-weight: 600; }
   button:disabled { opacity: 0.5; }
-  .err { color: var(--bad); }
-  .ok { color: var(--ok); }
+  .err { color: var(--bad-text); }
+  .ok { color: var(--ok-text); }
 </style>

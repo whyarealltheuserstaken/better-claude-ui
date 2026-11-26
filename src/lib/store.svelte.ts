@@ -75,16 +75,13 @@ class AppStore {
   activeId = $state<string | null>(null);
   error = $state<string | null>(null);
   showPresets = $state(false);
-  showCaps = $state(false);
   showPalette = $state(false);
-  showProjects = $state(false);
   update = $state<UpdateState>({ phase: "idle" });
   appVersion = $state("");
   showUpdate = $state(false);
   preview = $state<{ code: string; lang: string } | null>(null);
   toast = $state<string | null>(null);
   private toastTimer: ReturnType<typeof setTimeout> | null = null;
-  showEditor = $state(false);
   view = $state<View>("home");
   /** Where Back goes: the screen that was open before the first page. */
   private beforePage: View = "home";

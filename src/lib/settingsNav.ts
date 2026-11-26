@@ -1,4 +1,5 @@
 /** Pure navigation decisions for Settings and the other full pages. */
+import type { Tier } from "./tier";
 import type { IconName } from "./ui/icons";
 
 export type SettingsCategory = "general" | "appearance" | "usage" | "widget" | "data" | "updates";
@@ -22,6 +23,11 @@ export type View = "home" | "session" | "usage" | "archive" | PageView;
 
 export function isPage(view: string): view is PageView {
   return (PAGES as readonly string[]).includes(view);
+}
+
+/** Some pages are for people who edit Claude Code's own setup. */
+export function pageAllowed(page: PageView, tier: Tier): boolean {
+  return tier !== "beginner" || (page !== "capabilities" && page !== "instructions");
 }
 
 /** Escape leaves a page only when nothing floating on top of it is waiting to be closed. */

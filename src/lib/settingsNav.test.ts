@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { CATEGORIES, cleanCategory, escapeGoesBack, isPage } from "./settingsNav";
+import { CATEGORIES, cleanCategory, escapeGoesBack, isPage, pageAllowed } from "./settingsNav";
 import { ICONS } from "./ui/icons";
 
 describe("settings categories", () => {
@@ -28,5 +28,17 @@ describe("pages", () => {
     expect(escapeGoesBack(esc, "home", false)).toBe(false);
     expect(escapeGoesBack({ ...esc, defaultPrevented: true }, "settings", false)).toBe(false);
     expect(escapeGoesBack({ ...esc, key: "Enter" }, "settings", false)).toBe(false);
+  });
+});
+
+describe("page access by tier", () => {
+  test("Capabilities and Instructions are closed to Beginner", () => {
+    for (const page of ["capabilities", "instructions"] as const) {
+      expect(pageAllowed(page, "beginner"), page).toBe(false);
+      expect(pageAllowed(page, "intermediate"), page).toBe(true);
+      expect(pageAllowed(page, "advanced"), page).toBe(true);
+    }
+    expect(pageAllowed("settings", "beginner")).toBe(true);
+    expect(pageAllowed("projects", "beginner")).toBe(true);
   });
 });
