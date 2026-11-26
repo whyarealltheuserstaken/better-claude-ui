@@ -15,6 +15,7 @@ Use `tauri-plugin-updater` and drive it **from Rust**, not from the webview.
 
 ## Keys
 - One keypair, generated with `tauri signer generate`. The **public** key is committed. The **private key and its password are secrets**: they live only in GitHub Actions secrets (`TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`) and in the owner's own backup. `*.key` is in `.gitignore`.
+- **Backups:** a protected read-only copy lives in `C:\ProgramData\BetterClaudeUI\updater-key-backup\` and `node tools/check-updater-key.mjs` verifies it (see `docs/RELEASING.md`). The key is the *project's* publishing key; end users never hold it and installed apps only contain the public half, so app corruption or a reinstall cannot affect update ability.
 - **Losing the private key means installed copies can never be updated** (they would have to be reinstalled by hand with a build containing a new public key). Rotating keys is therefore a breaking operation; back the key up.
 - This is separate from OS code signing (Windows Authenticode, macOS notarization), which is not done.
 

@@ -27,7 +27,8 @@ Built (PR for branch `feat/updater`; design and security notes in ADR 0003):
 
 **Still open (owner actions or approval needed):**
 - [x] **GitHub Actions secrets added** (2026-11-26, with the owner's approval): `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. The key is also at `%USERPROFILE%\.bcu-updater\updater.key` (password in `key.password`) on the machine that generated it.
-- [ ] **Back up the private key and password** somewhere safe and separate (a password manager). Losing it means installed copies can never be updated.
+- [x] **Protected local backup of the private key and password** (automatic, outside AppData and the user profile, read-only, delete/overwrite blocked for the normal account; verify with `node tools/check-updater-key.mjs`). See `docs/RELEASING.md`.
+- [ ] **Off-machine copy of the key** (a single disk failure or OS reinstall would still lose the local ones). Awaiting the owner's choice of where; see HANDOFF 10j.
 - [x] **Real install-and-relaunch test passed** (2026-11-26, approved by the owner): a silent per-user install of a test 0.1.0, the real UI check, download, verify, "Install and restart", then the installed program was 0.1.1 and relaunched, all in about 8 s; then fully uninstalled. Reproduce with `tools/update-install-test.mjs` (see HANDOFF 10j).
 - [ ] macOS and Linux update paths (never run on real hardware)
 
