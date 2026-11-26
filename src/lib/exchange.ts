@@ -1,5 +1,6 @@
 /** Export / import: types shared with the Rust side and the pure logic around the import flow. */
 
+import { clampMinutes } from "./limits";
 import { allProjects, newProjectId } from "./projects";
 import { sanitizeStyle, sanitizeTheme } from "./theme";
 import { normalizeTier } from "./tier";
@@ -87,6 +88,8 @@ export function settingsPatch(raw: Record<string, unknown> | null): Partial<AppC
   if (typeof raw.style === "string" && /^[a-z0-9-_]{1,48}$/.test(raw.style)) patch.style = raw.style;
   if (typeof raw.default_model === "string" && /^[A-Za-z0-9._[\]-]{1,48}$/.test(raw.default_model)) patch.default_model = raw.default_model;
   if (typeof raw.auto_update_check === "boolean") patch.auto_update_check = raw.auto_update_check;
+  if (typeof raw.auto_refresh_limits === "boolean") patch.auto_refresh_limits = raw.auto_refresh_limits;
+  if (typeof raw.refresh_limits_minutes === "number") patch.refresh_limits_minutes = clampMinutes(raw.refresh_limits_minutes);
   for (const k of ["budget_daily_usd", "budget_monthly_usd"] as const) {
     const n = raw[k];
     if (typeof n === "number" && Number.isFinite(n) && n >= 0 && n <= 1_000_000) patch[k] = n;

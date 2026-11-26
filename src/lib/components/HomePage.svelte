@@ -3,6 +3,7 @@
   import { budgetState, fmtReset, fmtTokens, fmtUsd, modelLabel, pct, windowLabel } from "../format";
   import { WIDGETS, cleanWidgetList, moveWidget, toggleWidget } from "../widgets/registry";
   import DailyChart from "../widgets/DailyChart.svelte";
+  import AutoRefresh from "./AutoRefresh.svelte";
   import Meter from "../widgets/Meter.svelte";
   import Widget from "../widgets/Widget.svelte";
   import type { AppConfig, AuthStatus, CliStatus, LimitsSnapshot, SavedSession, Totals, UsageSummary } from "../types";
@@ -24,6 +25,8 @@
     refreshing = false,
     refreshError = null,
     onrefreshlimits = () => {},
+    onautorefresh = () => {},
+    limitsPaused = false,
     projects = [],
     onproject,
     onprojects,
@@ -44,6 +47,8 @@
     refreshing?: boolean;
     refreshError?: string | null;
     onrefreshlimits?: () => void;
+    onautorefresh?: (patch: { auto_refresh_limits?: boolean; refresh_limits_minutes?: number }) => void;
+    limitsPaused?: boolean;
     projects?: { id: string; name: string; cwd: string | null }[];
     onproject: (id: string, mode: "chat" | "code") => void;
     onprojects: () => void;
@@ -130,6 +135,7 @@
             <p class="sub" class:warn={behind}>Updated {asOfLabel(limits.captured_at, now)}{behind ? ", may be behind" : ""}. {LIMITS_NOTE}</p>
             <button class="link" disabled={refreshing} onclick={onrefreshlimits} title="Sends one tiny request (about a tenth of a cent in API terms) so Claude Code reports your current allowance. It counts a hair toward your allowance.">{refreshing ? "Refreshing…" : "Refresh now"}</button>
             {#if refreshError}<p class="sub warn" role="alert">{refreshError}</p>{/if}
+            <AutoRefresh enabled={config.auto_refresh_limits} minutes={config.refresh_limits_minutes} paused={limitsPaused} onchange={onautorefresh} />
           {/if}
         {:else if id === "spend-today" || id === "spend-month"}
           {@const t = usage ? (id === "spend-today" ? usage.today : usage.month) : null}

@@ -7,6 +7,12 @@ Legend: [x] done · [~] in progress · [ ] todo
 - [x] Always show "Updated N min ago" with a plain explanation; warn "may be behind" after 10 min; a window that has **reset** since the snapshot says so instead of showing its old percentage
 - [x] Optional **Refresh** (Home widget and Usage page): one minimal request (haiku, no tools/MCP/commands, nothing saved, one turn), about 8 s and about $0.001 API-equivalent, recorded in the usage ledger. Verified in the real app (`node tools/e2e.mjs limits`, throwaway profile)
 
+## Automatic allowance refresh (owner request 2026-11-26)
+- [x] Opt-in, off by default (it spends a little allowance, so nothing happens unless you turn it on): "Refresh automatically every N min" on the Home widget and Usage page, N from 5 to 180 (presets 5/10/15/30/60/120)
+- [x] Smart: only while the app is visible; counted from the LAST update, so replies you send postpone it; one at a time; pauses after 3 failed attempts in a row (for example API-key logins, which have no allowance windows); manual Refresh or a success resumes it
+- [x] Cheaper and faster: refreshes now run with `--setting-sources project`, which skips plugin hooks (0 instead of 3), about 2 s instead of 7 s and about 5x cheaper (about $0.0001)
+- [x] Verified in the real app with nothing clicked (`node tools/e2e.mjs autorefresh`, throwaway profile): refreshed on its own, exactly once, no repeat inside the interval, off switch saved
+
 ## Data export and import (requested 2026-11-26; ADR 0004, spec in `docs/EXPORT_FORMAT.md`)
 - [x] Export all my data: restorable `backup.json`, documented `universal.json`, one Markdown file per conversation, README with a privacy note; never overwrites a folder
 - [x] Import: Claude.ai ZIP, ChatGPT ZIP/JSON (tree flattened to the branch you saw), BetterClaudeUI backup or export folder, Markdown/text, best-effort for other JSON (Grok exporters etc., with a warning); preview before anything is saved; re-imports add nothing

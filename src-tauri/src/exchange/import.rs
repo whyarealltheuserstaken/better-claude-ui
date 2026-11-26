@@ -415,8 +415,17 @@ pub fn sanitize_settings(cfg: &Value) -> Value {
     if let Some(v) = word(o.get("default_model"), 48, &['.', '[', ']']) {
         out.insert("default_model".into(), v.into());
     }
-    if let Some(b) = o.get("auto_update_check").and_then(Value::as_bool) {
-        out.insert("auto_update_check".into(), b.into());
+    for k in ["auto_update_check", "auto_refresh_limits"] {
+        if let Some(b) = o.get(k).and_then(Value::as_bool) {
+            out.insert(k.into(), b.into());
+        }
+    }
+    if let Some(n) = o
+        .get("refresh_limits_minutes")
+        .and_then(Value::as_u64)
+        .filter(|n| (5..=180).contains(n))
+    {
+        out.insert("refresh_limits_minutes".into(), n.into());
     }
     for k in ["budget_daily_usd", "budget_monthly_usd"] {
         if let Some(n) = o

@@ -134,6 +134,10 @@ pub fn refresh_args() -> Vec<String> {
         "--strict-mcp-config",
         "--disable-slash-commands",
         "--no-session-persistence",
+        // Skip the user's own settings and plugins: no hooks run (0 instead of several), it takes about
+        // 2 s instead of 7 s and costs about 5x less. Sign-in still works (credentials are not settings).
+        "--setting-sources",
+        "project",
         "--max-turns",
         "1",
         "Reply with the single word ok.",
@@ -466,6 +470,11 @@ mod tests {
         assert!(
             !a.contains(&"--bare".to_string()),
             "--bare skips subscription sign-in"
+        );
+        assert_eq!(
+            a[at("--setting-sources") + 1],
+            "project",
+            "user hooks and plugins must not run on every refresh"
         );
     }
 

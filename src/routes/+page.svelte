@@ -214,6 +214,8 @@
             refreshing={app.limitsRefreshing}
             refreshError={app.limitsError}
             onrefreshlimits={() => app.refreshLimits()}
+            onautorefresh={(p) => app.setAutoRefresh(p)}
+            limitsPaused={app.limitsPaused}
             projects={app.projects}
             onproject={(id, mode) => { app.setMode(mode); void app.newSession({ projectId: id }); }}
             onprojects={() => (app.showProjects = true)}
@@ -245,6 +247,8 @@
             refreshing={app.limitsRefreshing}
             refreshError={app.limitsError}
             onrefreshlimits={() => app.refreshLimits()}
+            onautorefresh={(p) => app.setAutoRefresh(p)}
+            limitsPaused={app.limitsPaused}
             onopen={(u) => void openUrl(u)}
           />
         </div>

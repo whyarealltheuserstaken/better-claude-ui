@@ -148,6 +148,8 @@ export interface AppConfig {
   auto_update_check: boolean;
   last_update_check: number | null;
   skipped_version: string | null;
+  auto_refresh_limits: boolean;
+  refresh_limits_minutes: number;
 }
 
 export interface AgentDef {

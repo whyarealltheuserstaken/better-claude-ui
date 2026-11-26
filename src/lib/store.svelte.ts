@@ -2,6 +2,7 @@ import { type PendingAttachment, composeText, toWire } from "./attachments";
 import { exportMarkdown } from "./export";
 import { allProjects, findProject } from "./projects";
 import { type ArchiveDoc, type ArchiveEntry, continueContext } from "./archive";
+import { MAX_FAILURES, shouldAutoRefresh } from "./limits";
 import { type ExportResult, type ImportResult, mergeProjects, settingsPatch } from "./exchange";
 import { ipc, onSessionEvent, onUpdateProgress, pickFolder } from "./ipc";
 import { type UpdateProblem, type UpdateState, installBlockedReason, reduceUpdate, shouldAutoCheck } from "./updates";
@@ -45,6 +46,8 @@ const defaultConfig = (): AppConfig => ({
   auto_update_check: true,
   last_update_check: null,
   skipped_version: null,
+  auto_refresh_limits: false,
+  refresh_limits_minutes: 15,
 });
 
 /** First user message, trimmed, as a human title for a chat. */
@@ -88,6 +91,8 @@ class AppStore {
   homeEditing = $state(false);
   limitsRefreshing = $state(false);
   limitsError = $state<string | null>(null);
+  limitsFailures = $state(0);
+  limitsPaused = $derived(this.limitsFailures >= MAX_FAILURES);
   auth = $state<AuthStatus | null>(null);
   authSkipped = $state(false);
   presets = $state<Preset[]>([]);
@@ -132,6 +137,9 @@ class AppStore {
     this.limits = await ipc.usageLimits().catch(() => null);
     await this.refreshUsage();
     await this.loadArchive();
+    // Opt-in automatic refresh of the plan allowance: checked every minute, runs only when due.
+    setTimeout(() => void this.autoRefreshTick(), 20_000);
+    setInterval(() => void this.autoRefreshTick(), 60_000);
     await this.checkCli();
   }
 
@@ -250,18 +258,46 @@ class AppStore {
   }
 
   /** One tiny request so Claude Code reports the current plan allowance (see limits.ts). */
-  async refreshLimits() {
+  async refreshLimits(auto = false) {
     if (this.limitsRefreshing) return;
     this.limitsRefreshing = true;
-    this.limitsError = null;
+    if (!auto) this.limitsError = null;
     try {
       this.limits = await ipc.refreshLimits();
+      this.limitsFailures = 0; // any success (manual or automatic) resumes automatic refreshes
+      this.limitsError = null;
       await this.refreshUsage();
     } catch (e) {
-      this.limitsError = typeof e === "string" ? e : "Couldn't refresh right now. Please try again.";
+      const msg = typeof e === "string" ? e : "Couldn't refresh right now. Please try again.";
+      if (auto) {
+        this.limitsFailures += 1; // only automatic failures count towards pausing
+        if (this.limitsFailures >= MAX_FAILURES) this.limitsError = `Automatic refresh paused after ${MAX_FAILURES} failed attempts. ${msg}`;
+      } else {
+        this.limitsError = msg;
+      }
     } finally {
       this.limitsRefreshing = false;
     }
+  }
+
+  async autoRefreshTick() {
+    const due = shouldAutoRefresh({
+      enabled: this.config.auto_refresh_limits,
+      minutes: this.config.refresh_limits_minutes,
+      capturedAtMs: this.limits?.captured_at ?? null,
+      nowMs: Date.now(),
+      visible: typeof document === "undefined" || document.visibilityState === "visible",
+      busy: this.limitsRefreshing,
+      failures: this.limitsFailures,
+    });
+    if (due) await this.refreshLimits(true);
+  }
+
+  /** Change the automatic-refresh settings; turning it on gives it a fresh start. */
+  async setAutoRefresh(patch: { auto_refresh_limits?: boolean; refresh_limits_minutes?: number }) {
+    if (patch.auto_refresh_limits) this.limitsFailures = 0;
+    await this.updateConfig(patch);
+    if (patch.auto_refresh_limits) void this.autoRefreshTick();
   }
 
   async refreshUsage(days?: number) {

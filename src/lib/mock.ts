@@ -138,7 +138,7 @@ export async function mockInvoke<T>(cmd: string, args?: Record<string, unknown>)
     case "list_presets":
       return [{ id: "deep-research", title: "Deep Research", description: "Mock preset", cost_note: "Costs more", agents: { researcher: { description: "r", prompt: "p" } }, system_prompt: "s", custom: false }] as T;
     case "get_config":
-      return JSON.parse(localStorage.getItem("mock_config") ?? "null") ?? { tier: "beginner", onboarded: false, default_model: null, default_permission_mode: null, always_allow: [], extra_args: [], recents: [], theme: "auto", style: "modern", custom_themes: [], custom_styles: [], budget_daily_usd: null, budget_monthly_usd: null, projects: [], auto_update_check: true, last_update_check: null, skipped_version: null, home_widgets: ["quick-start", "limits", "spend-today", "spend-month", "daily-chart", "by-model", "by-project", "recent", "status"] } as T;
+      return JSON.parse(localStorage.getItem("mock_config") ?? "null") ?? { tier: "beginner", onboarded: false, default_model: null, default_permission_mode: null, always_allow: [], extra_args: [], recents: [], theme: "auto", style: "modern", custom_themes: [], custom_styles: [], budget_daily_usd: null, budget_monthly_usd: null, projects: [], auto_update_check: true, last_update_check: null, skipped_version: null, auto_refresh_limits: false, refresh_limits_minutes: 15, home_widgets: ["quick-start", "limits", "spend-today", "spend-month", "daily-chart", "by-model", "by-project", "recent", "status"] } as T;
     case "set_config":
       localStorage.setItem("mock_config", JSON.stringify(args!.config));
       return undefined as T;
