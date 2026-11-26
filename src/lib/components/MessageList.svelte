@@ -19,6 +19,16 @@
   let scroller: HTMLDivElement | undefined = $state();
   let stick = true;
 
+  /** Show the item (loading older messages if needed) and scroll to it. */
+  export async function jumpTo(id: string) {
+    const index = items.findIndex((i) => i.id === id);
+    if (index < 0) return;
+    if (index < start) extra = items.length - pageSize - index;
+    stick = false;
+    await tick();
+    [...(scroller?.querySelectorAll<HTMLElement>("[data-item]") ?? [])].find((el) => el.dataset.item === id)?.scrollIntoView({ block: "center" });
+  }
+
   function onScroll() {
     if (!scroller) return;
     stick = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 80;
@@ -39,7 +49,7 @@
       <button class="earlier" onclick={() => (extra += pageSize)}>Show {Math.min(start, pageSize)} earlier messages</button>
     {/if}
     {#each visible as item (item.id)}
-      <Message {item} {diffs} {oncopy} {onpreview} />
+      <div data-item={item.id}><Message {item} {diffs} {oncopy} {onpreview} /></div>
     {/each}
   </div>
 </div>
