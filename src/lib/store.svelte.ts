@@ -1,6 +1,8 @@
 import { type PendingAttachment, composeText, toWire } from "./attachments";
 import { exportMarkdown } from "./export";
 import { allProjects, findProject } from "./projects";
+import { type ArchiveDoc, type ArchiveEntry, continueContext } from "./archive";
+import { type ExportResult, type ImportResult, mergeProjects, settingsPatch } from "./exchange";
 import { ipc, onSessionEvent, onUpdateProgress, pickFolder } from "./ipc";
 import { type UpdateProblem, type UpdateState, installBlockedReason, reduceUpdate, shouldAutoCheck } from "./updates";
 import { addUserMessage, initialState, reduce, removePending, restoreItems } from "./reducer";
@@ -13,6 +15,8 @@ export interface SessionMeta {
   cwd: string | null;
   mode: Mode;
   model: string | null;
+  /** Keep this title instead of deriving one from the first message. */
+  lockTitle?: boolean;
   permissionMode: string | null;
   preset: string | null;
   effort: string | null;
@@ -73,7 +77,11 @@ class AppStore {
   toast = $state<string | null>(null);
   private toastTimer: ReturnType<typeof setTimeout> | null = null;
   showEditor = $state(false);
-  view = $state<"home" | "session" | "usage">("home");
+  view = $state<"home" | "session" | "usage" | "archive">("home");
+  archive = $state<ArchiveEntry[]>([]);
+  viewing = $state<{ entry: ArchiveEntry; doc: ArchiveDoc } | null>(null);
+  showImport = $state(false);
+  exportState = $state<{ phase: "idle" | "working" | "done" | "error"; result?: ExportResult; error?: string }>({ phase: "idle" });
   limits = $state<LimitsSnapshot | null>(null);
   usage = $state<UsageSummary | null>(null);
   usageDays = $state(30);
@@ -121,6 +129,7 @@ class AppStore {
     this.presets = await ipc.listPresets().catch(() => []);
     this.limits = await ipc.usageLimits().catch(() => null);
     await this.refreshUsage();
+    await this.loadArchive();
     await this.checkCli();
   }
 
@@ -178,12 +187,72 @@ class AppStore {
     this.showUpdate = false;
   }
 
+  // ---- Archive, export and import ----
+  async loadArchive() {
+    this.archive = await ipc.archiveList().catch(() => this.archive);
+  }
+
+  async openArchive(id: string) {
+    const entry = this.archive.find((e) => e.id === id);
+    const doc = entry ? await ipc.archiveGet(id).catch(() => null) : null;
+    if (!entry || !doc) {
+      this.error = "That conversation couldn't be opened.";
+      return;
+    }
+    this.viewing = { entry, doc };
+    this.view = "archive";
+  }
+
+  async deleteArchive(id: string) {
+    await ipc.archiveDelete(id).catch((e) => (this.error = String(e)));
+    if (this.viewing?.entry.id === id) this.viewing = null;
+    await this.loadArchive();
+  }
+
+  /** Start a new chat whose first message carries the archived transcript as an attachment. */
+  async continueFromArchive(id: string) {
+    const entry = this.archive.find((e) => e.id === id);
+    const doc = entry ? await ipc.archiveGet(id).catch(() => null) : null;
+    if (!entry || !doc || doc.messages.length === 0) {
+      this.error = "That conversation couldn't be opened.";
+      return;
+    }
+    const ctx = continueContext(entry.title, entry.source, doc.messages);
+    this.setMode("chat");
+    await this.newSession();
+    const meta = this.activeMeta;
+    if (!meta) return;
+    this.metas = this.metas.map((m) => (m.id === meta.id ? { ...m, title: `Continued: ${entry.title}`.slice(0, 60), lockTitle: true } : m));
+    await this.send(ctx.message, [{ id: "ctx", name: "earlier-conversation.md", kind: "text", media_type: "text/plain", size: ctx.transcript.length, text: ctx.transcript }]);
+  }
+
+  async exportAll() {
+    const folder = await pickFolder();
+    if (!folder) return;
+    this.exportState = { phase: "working" };
+    try {
+      this.exportState = { phase: "done", result: await ipc.exportData(folder) };
+    } catch (e) {
+      this.exportState = { phase: "error", error: String(e) };
+    }
+  }
+
+  /** Apply the parts of an import result that live in the config (the UI owns the config file). */
+  async finishImport(r: ImportResult): Promise<{ projectsAdded: number; settingsApplied: boolean }> {
+    const patch: Partial<AppConfig> = settingsPatch(r.settings);
+    const merged = r.projects.length > 0 ? mergeProjects(this.config.projects, r.projects) : { projects: this.config.projects, added: 0 };
+    if (merged.added > 0) patch.projects = merged.projects;
+    if (Object.keys(patch).length > 0) await this.updateConfig(patch);
+    await this.loadArchive();
+    return { projectsAdded: merged.added, settingsApplied: r.settings !== null && Object.keys(settingsPatch(r.settings)).length > 0 };
+  }
+
   async refreshUsage(days?: number) {
     if (days) this.usageDays = days;
     this.usage = await ipc.usageSummary(this.usageDays).catch(() => this.usage);
   }
 
-  go(view: "home" | "session" | "usage") {
+  go(view: "home" | "session" | "usage" | "archive") {
     this.view = view;
   }
 
@@ -372,11 +441,11 @@ class AppStore {
     const meta = this.metas.find((m) => m.id === id);
     const st = this.states[id];
     if (!meta || !st?.cliSessionId) return;
-    const title = meta.mode === "chat" || meta.title === folderName(meta.cwd) ? titleFrom(st.items, meta.title) : meta.title;
+    const title = meta.lockTitle ? meta.title : meta.mode === "chat" || meta.title === folderName(meta.cwd) ? titleFrom(st.items, meta.title) : meta.title;
     if (meta.mode === "chat" && title !== meta.title) this.metas = this.metas.map((m) => (m.id === id ? { ...m, title } : m));
     const entry: SavedSession = {
       cli_session_id: st.cliSessionId,
-      title: meta.mode === "chat" ? title : `${folderName(meta.cwd)} — ${titleFrom(st.items, "")}`.replace(/ — $/, ""),
+      title: meta.lockTitle || meta.mode === "chat" ? title : `${folderName(meta.cwd)} — ${titleFrom(st.items, "")}`.replace(/ — $/, ""),
       cwd: meta.cwd,
       mode: meta.mode,
       model: meta.model,

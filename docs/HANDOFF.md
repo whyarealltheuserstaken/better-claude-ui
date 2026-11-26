@@ -72,7 +72,7 @@ What the owner asked for, in their own terms:
 
 **Measured (Windows release build, 2026-11-25):** NSIS installer 2.58 MB, MSI 3.57 MB (the updater added about 0.85 MB; earlier figures 1.74/2.51 MB were before it); Home visible in about 0.9 s from launch (including test attach); idle memory about 157 MB private across 7 processes (the app exe itself is 6 MB; the rest is WebView2), rising to about 255 MB after a real chat with a preview open. The original "under 100 MB" target is not achievable with WebView2; treat about 160 MB idle as the realistic figure (still far below Electron).
 
-**Tests:** Rust 94 unit + 8 integration, clippy `-D warnings` and fmt clean; UI 131 Vitest tests, `npm run check` 0 errors; 8 real-app E2E scenarios (`basic`, `attach`, `caps`, `chat`, `projects`, `preview`, `updater`, `probe`).
+**Tests:** Rust 100+ unit and 8 integration (134 lib tests), clippy `-D warnings` and fmt clean; UI 148 Vitest tests, `npm run check` 0 errors; 9 real-app E2E scenarios (`basic`, `attach`, `caps`, `chat`, `projects`, `preview`, `updater`, `data`, `probe`).
 
 ## 4. How to build, run, test
 
@@ -187,6 +187,13 @@ The parser, broker and registry were written test-first with a RED run observed.
 - Incident (2026-11-25): a first version of the cleanup compared "recents now" against a snapshot taken before the app had finished loading its config, so it treated every saved conversation as test data and deleted two real ones. They were rebuilt from the CLI's own session files (`~/.claude/projects/<folder>/<id>.jsonl`), which is a useful recovery path: the CLI keeps its own copy of every session.
 - Rule now: `tidy()` in `tools/e2e.mjs` only forgets conversations whose `cliSessionId` belongs to a session that is LIVE in the freshly launched app (opened by the test). Never use a before/after diff of saved history. Scenarios that change settings (`tier`, `projects`) restore them in a `finally`.
 - E2E spend still appears in the Usage ledger (it is real spend).
+
+## 10k. Data export / import / Archive (session 3)
+- Code: `src-tauri/src/exchange/` (`model` shared types and helpers, `parse` importers, `archive` store, `export`, `import`), commands `export_data`, `inspect_import`, `run_import`, `archive_*` in `commands.rs`; UI `ImportPanel.svelte`, `ArchivePage.svelte`, Settings "Your data", sidebar "Archive"; helpers `exchange.ts`, `archive.ts`. Spec: `docs/EXPORT_FORMAT.md`; decisions and security: ADR 0004.
+- **Imported chats are not CLI sessions**, so they live in `<config>/archive/` (not in recents, which are capped at 50) and are read-only; "Continue in a new chat" attaches the transcript to a new chat's first message.
+- Archive ids are stable hashes (`imp-<fnv1a>`) so re-imports add nothing; archive items inside a backup keep their id, so restoring on the same machine never duplicates. Search (`search.rs`) covers transcripts AND the archive (a bug where a missing transcripts folder skipped the archive was found by the E2E and fixed).
+- Importer formats are from community descriptions only; keep warnings honest and add fixtures if a real export breaks one. The Grok path is generic best-effort.
+- **Testing aid:** `BCU_CONFIG_DIR` (debug builds only) redirects the app to a throwaway profile; `node tools/e2e.mjs data` uses it and also builds sample ZIP/JSON/Markdown files. The native file dialog can't be driven (the Tauri bridge is immutable by design), so the E2E replaces the dialog plugin module at the network layer.
 
 ## 10j. Updater notes (session 3)
 - Design and security: `docs/DECISIONS/0003-in-app-updater.md`. Code: `src-tauri/src/updates.rs` (pure), commands in `commands.rs`, UI state machine in `src/lib/updates.ts`, UI in `UpdatePanel.svelte` and the Settings "Updates" section.

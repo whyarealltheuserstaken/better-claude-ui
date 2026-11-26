@@ -56,7 +56,12 @@ Built (PR for branch `feat/updater`; design and security notes in ADR 0003):
 
 **End-to-end testing note.** A real test needs two published, signed versions (for example a pre-release `0.1.0-test.1` and `0.1.0-test.2`). Publishing even a test release is an outward-facing action, so ask the owner first.
 
+## Done since the gate was set
+- Data export and import with an Archive (owner request 2026-11-26). See `docs/EXPORT_FORMAT.md` and ADR 0004. **Please try it with your own real Claude.ai / ChatGPT export** and report anything that doesn't import: the formats are undocumented and I could only test fixtures.
+
 ## Backlog (not committed; nothing here blocks v0.1.0)
+- Scheduled / automatic backups of the user's data (today it is a manual export)
+- Real-export compatibility fixes once real files are available; a verified Grok importer once a real export format is confirmed
 - Embedded terminal (PTY) as an Advanced fallback
 - In-app preset editor for agent teams
 - Notifications when a turn finishes or a permission is needed while the app is in the background

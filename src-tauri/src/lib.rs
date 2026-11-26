@@ -1,6 +1,7 @@
 pub mod cli;
 pub mod commands;
 pub mod config;
+pub mod exchange;
 pub mod features;
 pub mod files;
 pub mod permissions;
@@ -30,6 +31,12 @@ pub fn run() {
             commands::pending_permissions,
             commands::list_features,
             commands::list_presets,
+            commands::export_data,
+            commands::inspect_import,
+            commands::run_import,
+            commands::archive_list,
+            commands::archive_get,
+            commands::archive_delete,
             commands::app_version,
             commands::check_for_update,
             commands::download_update,
