@@ -11,7 +11,8 @@
 //   replay    (needs `replayArtifact`) a real installer signed for an OLDER version, announced as newer
 // The dummy payload is NOT an installer: tests must stop at "ready to install" and never call install.
 import { execFileSync } from "node:child_process";
-import { createServer } from "node:http";
+import { createServer as createHttpServer } from "node:http";
+import { createServer as createHttpsServer } from "node:https";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -23,7 +24,7 @@ function sign(keyPath, password, file) {
   return readFileSync(file + ".sig", "utf8").trim();
 }
 
-export async function startUpdateServer({ port = 9488, appVersion = "0.1.0", newVersion = "0.1.1", realArtifact = null, replayArtifact = null } = {}) {
+export async function startUpdateServer({ port = 9488, appVersion = "0.1.0", newVersion = "0.1.1", realArtifact = null, replayArtifact = null, https = false } = {}) {
   const home = process.env.USERPROFILE ?? process.env.HOME;
   const keyPath = join(home, ".bcu-updater", "updater.key");
   const password = readFileSync(join(home, ".bcu-updater", "key.password"), "utf8");
@@ -54,7 +55,16 @@ export async function startUpdateServer({ port = 9488, appVersion = "0.1.0", new
 
   let mode = "ok";
   const hits = [];
-  const base = `http://127.0.0.1:${port}`;
+  const base = `${https ? "https" : "http"}://127.0.0.1:${port}`;
+  // HTTPS mode (for release-build tests): a throwaway self-signed certificate; the test build must be
+  // configured with dangerousAcceptInvalidCerts. Production builds never accept such a certificate.
+  let tls = null;
+  if (https) {
+    const key = join(dir, "test-key.pem");
+    const cert = join(dir, "test-cert.pem");
+    execFileSync("openssl", ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", key, "-out", cert, "-days", "2", "-subj", "/CN=127.0.0.1", "-addext", "subjectAltName=IP:127.0.0.1"], { stdio: "ignore" });
+    tls = { key: readFileSync(key), cert: readFileSync(cert) };
+  }
   const manifest = (version, url, signature) => JSON.stringify({
     version,
     notes: "- Test release notes\n- Served by the local test server",
@@ -62,7 +72,7 @@ export async function startUpdateServer({ port = 9488, appVersion = "0.1.0", new
     platforms: { "windows-x86_64": { signature, url }, "linux-x86_64": { signature, url }, "darwin-x86_64": { signature, url }, "darwin-aarch64": { signature, url } },
   });
 
-  const server = createServer((req, res) => {
+  const handler = (req, res) => {
     hits.push(req.method + " " + req.url);
     const send = (status, body, type = "application/json") => { res.writeHead(status, { "content-type": type, "content-length": Buffer.byteLength(body) }); res.end(body); };
     if (req.url.startsWith("/__mode/")) { mode = req.url.slice(8); return send(200, mode, "text/plain"); }
@@ -82,7 +92,8 @@ export async function startUpdateServer({ port = 9488, appVersion = "0.1.0", new
     if (req.url === "/other.bin") return send(200, payload, "application/octet-stream");
     if (req.url === "/tampered.bin") return send(200, tampered, "application/octet-stream");
     send(404, "not found", "text/plain");
-  });
+  };
+  const server = tls ? createHttpsServer(tls, handler) : createHttpServer(handler);
   await new Promise((r) => server.listen(port, "127.0.0.1", r));
   return {
     endpoint: `${base}/latest.json`,

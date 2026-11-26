@@ -6,7 +6,7 @@ The single place for "what must happen before the first release, and what comes 
 
 **Do not tag or publish v0.1.0 until every item below is done.** The app itself is otherwise feature-complete (see `docs/HANDOFF.md` section 3).
 
-1. **In-app updater, built first.** Status: **implemented and verified in the real app, except the final install-and-relaunch step, which needs the owner's go-ahead.** Design: `docs/DECISIONS/0003-in-app-updater.md`. Remaining owner actions are listed under "Updater status" below.
+1. **In-app updater, built first.** Status: **implemented and fully verified on Windows, including a real install-and-relaunch (0.1.0 to 0.1.1).** Only the owner's key backup and non-Windows paths remain. Design: `docs/DECISIONS/0003-in-app-updater.md`. Remaining owner actions are listed under "Updater status" below.
 2. **A few more features, defined by the owner and built by a different agent.** Status: **not started; list to be added by the owner.** Put them here as they are decided, one line each with acceptance criteria:
    - _(owner to fill in)_
    - _(owner to fill in)_
@@ -26,9 +26,9 @@ Built (PR for branch `feat/updater`; design and security notes in ADR 0003):
 - [x] A real `tauri build` installer, signed as 0.1.1, verifies against the app's public key (`BCU_REAL_ARTIFACT`)
 
 **Still open (owner actions or approval needed):**
-- [ ] **Add the two GitHub Actions secrets** (`TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`). Until then a tagged release build will stop at the guard step by design. The key is at `%USERPROFILE%\.bcu-updater\updater.key` with its password in `key.password` on the machine that generated it.
+- [x] **GitHub Actions secrets added** (2026-11-26, with the owner's approval): `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. The key is also at `%USERPROFILE%\.bcu-updater\updater.key` (password in `key.password`) on the machine that generated it.
 - [ ] **Back up the private key and password** somewhere safe and separate (a password manager). Losing it means installed copies can never be updated.
-- [ ] **Real install-and-relaunch test** (install an old build, update it to a newer signed one, confirm it relaunches on the new version). It replaces an installed app, so it needs approval, plus two real versions.
+- [x] **Real install-and-relaunch test passed** (2026-11-26, approved by the owner): a silent per-user install of a test 0.1.0, the real UI check, download, verify, "Install and restart", then the installed program was 0.1.1 and relaunched, all in about 8 s; then fully uninstalled. Reproduce with `tools/update-install-test.mjs` (see HANDOFF 10j).
 - [ ] macOS and Linux update paths (never run on real hardware)
 
 ## Brief: in-app updater (original spec, kept for reference)

@@ -27,7 +27,7 @@ _(Screenshots use demo data.)_
 - **Extensible:** features, presets and themes are modules/data files (see `docs/EXTENDING.md`).
 
 ## Status
-Pre-release (0.1.0 candidate, not published yet: a few more features come first, see [`docs/GOALS.md`](docs/GOALS.md)). The in-app updater is built; real install testing is pending. Windows is the tested platform; macOS and Linux builds pass CI but have not been run on real hardware. Installers are unsigned. See [`docs/RELEASING.md`](docs/RELEASING.md).
+Pre-release (0.1.0 candidate, not published yet: a few more features come first, see [`docs/GOALS.md`](docs/GOALS.md)). The in-app updater is built and verified on Windows. Windows is the tested platform; macOS and Linux builds pass CI but have not been run on real hardware. Installers are unsigned. See [`docs/RELEASING.md`](docs/RELEASING.md).
 
 Roadmap and current state: See [`docs/PROGRESS.md`](docs/PROGRESS.md) for the roadmap and [`docs/HANDOFF.md`](docs/HANDOFF.md) for the current state.
 
