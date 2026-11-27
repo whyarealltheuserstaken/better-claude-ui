@@ -7,8 +7,8 @@ A lightweight desktop UI for [Claude Code](https://claude.com/claude-code): the 
 ## Screenshots
 | | |
 |---|---|
-| ![Home dashboard](docs/screenshots/home.png) | ![Usage and billing](docs/screenshots/usage.png) |
-| ![Terminal style](docs/screenshots/terminal-style.png) | ![Slash commands](docs/screenshots/slash-commands.png) |
+| ![A coding session asking for permission, with the usage widget](docs/screenshots/session.png) | ![Home with the message box](docs/screenshots/home.png) |
+| ![Usage and billing](docs/screenshots/usage.png) | ![Appearance settings](docs/screenshots/settings.png) |
 
 _(Screenshots use demo data.)_
 

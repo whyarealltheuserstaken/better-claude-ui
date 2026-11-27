@@ -45,7 +45,8 @@ for (const theme of themes) {
       // Home has a message box too, so wait for the session before typing.
       await page.getByRole("heading", { name: "Where should Claude start?" }).waitFor();
       const box = page.getByLabel("Message", { exact: true });
-      await box.fill("make an artifact");
+      // These shots go in the README: a prompt with "artifact" would add the demo's sandbox-test code.
+      await box.fill("Add a notes file");
       await box.press("Enter");
       await page.waitForTimeout(2500);
     });
