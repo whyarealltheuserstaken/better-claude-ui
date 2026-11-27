@@ -32,6 +32,11 @@ fn for_main_window_only(commands: Commands) -> Commands {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app = tauri::Builder::default()
+        // First, so a second launch stops before doing anything. Two copies would overwrite each
+        // other's settings and history, which is easy to cause once the window can hide in the tray.
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            tray::show_main(app)
+        }))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())

@@ -213,19 +213,23 @@ The parser, broker and registry were written test-first with a RED run observed.
 - **Key backup (2026-11-26):** `C:\ProgramData\BetterClaudeUI\updater-key-backup\` (read-only; normal account cannot delete/overwrite/rename; verified). `node tools/check-updater-key.mjs` checks key/backup/public-key/secrets consistency and that the backup can actually sign. Recovery steps are in `docs/RELEASING.md`. Note the password is stored beside the key locally, so this protects against accidental deletion and profile corruption, not against someone with access to the machine, and not against losing the machine: an off-machine copy is still open.
 - Keys live outside the repo in `%USERPROFILE%\.bcu-updater\` on the machine that generated them; `*.key` is gitignored. Never print or paste them.
 
-## 10m. UI and UX revamp (in progress)
+## 10m. UI and UX revamp (finished 2026-11-26)
 - Spec and plan: `docs/superpowers/specs/2026-11-26-ui-revamp-design.md`, `docs/superpowers/plans/2026-11-26-ui-revamp.md`. Progress log (local, git-ignored): `.superpowers/sdd/2026-11-26-ui-revamp/progress.md`.
-- **Done:** stages 1 to 6 (design system, shell, conversation and right panel, Home and Usage, Settings and the other pages, dialogs, usage widget). **Next:** Tasks 16 to 18 (tray, wrap-up).
+- **Done:** all seven stages (design system, shell, conversation and right panel, Home and Usage, Settings and the other pages, dialogs, usage widget, tray). **Next:** the owner's extra features (section 11), then publishing v0.1.0 only on the owner's go-ahead.
 - **Verified** by Vitest, type check, CI, screenshots against the mock backend (`npm run dev`, then `node tools/screenshots.mjs <dir>`; it also checks that the floating widget never covers Deny, Always allow, Allow or Send), and the real app on Windows: E2E `data`, `basic`, `caps`, `projects` and `widget` (throwaway profile) passed on 2026-11-26.
 - Widget rules to keep: the composer column draws above the floating widget; its CSS class names must not collide with reading kinds (`as-bar`, `as-ring`); toolbar chips stay alone inside `.chips` because the narrow-window rules count them. The tray should reuse `widget/readings.ts` and `app.widgetData`.
-- **Not checked in the real app:** title bar colours (no scenario looks at them). `attach`, `chat`, `limits`, `autorefresh`, `preview`, `probe`, `updater` and `tools/update-install-test.mjs` have not run since the layout changed; their selectors were updated but are unproven.
+- On the final code every `tools/e2e.mjs` scenario passed (including `tray`), and the title bar followed the light theme. **Not checked:** `tools/update-install-test.mjs` since the layout changed, clicking the real tray icon and the panel's placement and focus behaviour, macOS and Linux (on Linux a missing `libappindicator` may crash the app when the tray is turned on).
+- `e2e.mjs` rule: Windows has helper windows with the app's title, so native calls must filter by the app's own process (a title-only search once sent close messages to Explorer's windows).
+- Only one copy of the app runs. A debug build and an installed release share the app id, so close one before starting the other.
+- Idle memory rose by about 40 MB (see PROGRESS.md); accepted by the owner for now.
+- Known small gaps: on macOS the Dock icon does not show a window hidden to the tray; with the tray on, its view is rebuilt on every streamed piece of text; a budget at exactly 80% can read as below it (rounding).
 - Two things only a real browser shows: a page's Escape check must run in the capture phase (a closing dialog is gone before a normal window handler runs), and dialogs must use `ui/Dialog.svelte` so focus and Escape work.
-- The whole-branch review at the end of the plan has not happened yet.
+- The final review was done by the author: the fresh reviewer did not finish. A separate review is still worth doing.
 - Shell heredocs fail on long scripts here: use the Write tool for those.
 
 ## 11. Next steps (in order)
 1. ~~Build the in-app updater~~ **Done and verified** (ADR 0003). Key safety: a protected read-only local backup exists and `node tools/check-updater-key.mjs` verifies it; still open is an off-machine copy of the key (owner's choice). See "Updater status" in `docs/GOALS.md`.
-1b. **Now: the UI and UX revamp** (spec and plan dated 2026-11-26 in `docs/superpowers/`). **Then the extra features the owner is defining** (listed in `docs/GOALS.md`). Development stays with Claude Code on one device.
+1b. ~~The UI and UX revamp~~ **Done** (section 10m). **Now: the extra features the owner is defining** (listed in `docs/GOALS.md`). Development stays with Claude Code on one device.
 1c. **Only after 1 and 1b: publish v0.1.0** (owner decision). Follow `docs/RELEASING.md`: push a `v0.1.0` tag, let the workflow build a DRAFT release, test the installers, publish. Builds are unsigned (SmartScreen / Gatekeeper warnings).
 2. Run the installer + browser sign-in wizard steps on a clean machine or VM (never exercised end to end), and try dictation with a real microphone.
 3. Try the macOS and Linux builds on real hardware (CI only builds and tests them); verify "Continue in terminal" there.

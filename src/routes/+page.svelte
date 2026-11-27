@@ -12,7 +12,7 @@
   import Backdrop from "$lib/components/Backdrop.svelte";
   import Toolbar from "$lib/components/Toolbar.svelte";
   import Icon from "$lib/ui/Icon.svelte";
-  import { PANEL_DOCK_MIN_WIDTH, panelState, waitingModes } from "$lib/shell";
+  import { PANEL_DOCK_MIN_WIDTH, panelState, waitingModes, waitingOutOfSight } from "$lib/shell";
   import Palette from "$lib/components/Palette.svelte";
   import { allStyles, allThemes } from "$lib/theme";
   import type { PaletteItem } from "$lib/palette";
@@ -281,6 +281,7 @@
         title={heading.title}
         subtitle={heading.subtitle}
         onsidebar={toggleSidebar}
+        sidebarWaiting={waitingOutOfSight(!!app.config.sidebar_hidden, app.view, app.activeId, app.states)}
         onsearch={() => (app.showPalette = true)}
         onexport={app.view === "session" && active && active.items.length > 0 ? () => app.exportActive() : undefined}
         onterminal={app.view === "session" && active && active.items.length > 0 ? () => app.openTerminal() : undefined}
@@ -404,9 +405,14 @@
         {/if}
         <div class="dock">
           <div class="column">
-            {#each active.pending as p (p.request_id)}
-              <PermissionPrompt request={p} onresolve={(id, d) => app.resolve(id, d)} />
-            {/each}
+            {#if active.pending.length > 0}
+              <!-- Several can wait at once: they scroll, so the message box and Stop stay on screen. -->
+              <div class="prompts">
+                {#each active.pending as p (p.request_id)}
+                  <PermissionPrompt request={p} onresolve={(id, d) => app.resolve(id, d)} />
+                {/each}
+              </div>
+            {/if}
             <Composer status={active.status} {glyph} commands={active.info ? active.info.commands.map((c) => c.name) : (active.caps?.slash_commands ?? [])} descriptions={Object.fromEntries((active.info?.commands ?? []).map((c) => [c.name, c.description]))} onsend={(t, a) => app.send(t, a)} oninterrupt={() => app.interrupt()}>
               {#snippet controls()}
                 {#if panel === "closed"}{@render sessionControls("composer")}{/if}
@@ -604,6 +610,10 @@
   }
   .dock {
     padding: 0 24px 18px;
+  }
+  .prompts {
+    max-height: 38vh;
+    overflow-y: auto;
   }
   .column {
     /* Above the floating widget (10), below dialogs (12): it can never hide Allow, Deny or Send. */

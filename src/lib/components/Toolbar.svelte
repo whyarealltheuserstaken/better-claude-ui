@@ -10,6 +10,7 @@
     onexport,
     onterminal,
     onpanel,
+    sidebarWaiting = false,
     children,
   }: {
     title: string;
@@ -19,12 +20,14 @@
     onexport?: () => void;
     onterminal?: () => void;
     onpanel?: () => void;
+    /** A hidden sidebar is holding back the sign that a session is waiting. */
+    sidebarWaiting?: boolean;
     children?: Snippet;
   } = $props();
 </script>
 
 <header>
-  <button class="btn-icon" aria-label="Show or hide the sidebar" title="Show or hide the sidebar (Ctrl+B)" onclick={onsidebar}><Icon name="sidebar" /></button>
+  <button class="btn-icon side" aria-label={sidebarWaiting ? "Show or hide the sidebar. A session is waiting for you" : "Show or hide the sidebar"} title={sidebarWaiting ? "A session is waiting for you. Show the sidebar (Ctrl+B)" : "Show or hide the sidebar (Ctrl+B)"} onclick={onsidebar}><Icon name="sidebar" />{#if sidebarWaiting}<span class="badge" aria-hidden="true">!</span>{/if}</button>
   <div class="titles">
     <h1>{title}</h1>
     {#if subtitle}<p title={subtitle}>{subtitle}</p>{/if}
@@ -42,6 +45,8 @@
 
 <style>
   header { container-type: inline-size; display: flex; align-items: center; gap: 10px; min-height: 54px; padding: 6px 14px; flex: none; }
+  .side { position: relative; }
+  .side .badge { position: absolute; top: -3px; inset-inline-end: -5px; min-width: 15px; padding: 0 3px; font-size: 11px; line-height: 15px; }
   .titles { min-width: 0; flex: 1 1 0; }
   h1 { margin: 0; font-size: 15px; font-weight: 650; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   p { margin: 0; font-size: 11.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

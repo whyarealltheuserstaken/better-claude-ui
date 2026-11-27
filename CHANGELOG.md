@@ -5,6 +5,7 @@
 - **Home message box:** start a chat or coding session by typing.
 - **Usage widget:** nine readings, three sizes; right panel, floating, toolbar or hidden; token counts move while Claude replies.
 - **System tray / menu bar** (optional, off by default): readings, a waiting icon, and close-to-tray if you turn it on. Nothing can be approved from it. Tested on Windows only.
+- Only one copy of the app runs at a time: starting it again brings the running window back.
 - **In-app updater**: signed updates only (tampered, wrongly signed and replayed installers are rejected), quiet daily check, manual check, release notes, progress, skip a version, never installs without a click or mid-reply. Verified against a local signed test server and with a real install-and-relaunch on Windows (0.1.0 to 0.1.1).
 - **Automatic allowance refresh** (opt-in): refresh the plan meters every 5 to 180 minutes while the app is visible; replies postpone it; pauses after repeated failures. Refreshes skip plugin hooks, so they take about 2 s and cost about $0.0001.
 - **Plan allowance freshness**: the usage meters say when they were last updated and why they can lag (Claude Code only reports them with each reply), a window that has reset no longer shows its old percentage, and a Refresh button fetches the live numbers with one tiny request (about a tenth of a cent).

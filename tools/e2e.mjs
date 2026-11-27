@@ -194,6 +194,17 @@ try {
     expect(visible("BetterClaudeUI") === "False", "the window did not hide");
     step("closing with Keep running on hid the window; the app is still running");
 
+    // Starting the app again (Start menu) must bring this one back, not run a second copy over the same settings.
+    // Same WebView2 arguments as the first copy: with different ones WebView2 refuses to start it at all.
+    const second = spawn(join(process.cwd(), "src-tauri", "target", "debug", "better-claude-ui.exe"), [], { stdio: "ignore", env: { ...process.env, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${PORT}` } });
+    for (let i = 0; i < 50 && second.exitCode === null; i++) await new Promise((r) => setTimeout(r, 300));
+    expect(second.exitCode !== null, "starting the app again left a second copy running");
+    expect(running() === 1, "expected exactly one copy, found " + running());
+    await until("the hidden window to come back", () => visible("BetterClaudeUI") === "True");
+    step("starting the app again closed the new copy and showed the window");
+    closeWindow("BetterClaudeUI");
+    await until("the window to hide again", () => visible("BetterClaudeUI") === "False");
+
     await store("async (app, cwd) => { app.mode = 'code'; await app.newSession({ cwd }); await app.send('Use the Write tool to create hello.txt containing the word hi. Do nothing else.'); }", work);
     await until("a permission request while hidden", () => store("(app) => (app.active?.pending.length ?? 0) > 0"));
     await until("the tray being told while hidden", () => store("(app) => String(app.traySent).includes('\"waiting\":true')"));
@@ -533,7 +544,7 @@ try {
   if (scenario === "updater") {
     const before = await page.evaluate(async () => {
       const { app } = await import("/src/lib/store.svelte.ts");
-      const c = { auto_update_check: app.config.auto_update_check, last_update_check: app.config.last_update_check, skipped_version: app.config.skipped_version };
+      const c = { auto_update_check: app.config.auto_update_check, last_update_check: app.config.last_update_check, skipped_version: app.config.skipped_version, settings_category: app.config.settings_category };
       await app.updateConfig({ auto_update_check: false, skipped_version: null }); // keep the run deterministic
       return c;
     });

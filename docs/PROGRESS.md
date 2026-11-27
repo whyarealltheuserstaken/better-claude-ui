@@ -30,7 +30,11 @@ Legend: [x] done · [~] in progress · [ ] todo
 - [x] Real-app E2E on the new layout (2026-11-26, Windows): `data`, `basic`, `caps`, `projects` passed. Not re-run: `attach`, `chat`, `limits`, `autorefresh`, `preview`, `probe`, `updater`, the real update-install test
 - [x] Stage 6: usage widget (right panel, floating, toolbar or hidden; nine readings, three sizes; customized from its gear, Settings or the command palette) with token counts that move while Claude replies. It reads only local data and never sends a request
 - [x] Real-app check of the widget (2026-11-26, Windows, Claude Haiku, `node tools/e2e.mjs widget`): counts appeared during two replies, and each finished total matched the usage log exactly. Not checked in the real app: a reply that uses a helper agent, and dragging the floating widget (checked in Edge against the mock backend)
-- [ ] Stage 7: tray
+- [x] Stage 7: optional system tray / menu bar (ADR 0005): readings and a waiting icon, a small panel that cannot approve anything, close-to-tray (off by default), quit asks first while Claude is replying or waiting
+- [x] Final review of the whole revamp (by the author; a separate reviewer did not finish). Fixed: a waiting request could be invisible with the sidebar and widget hidden; several waiting requests pushed Stop and Allow off screen in a small window; starting the app again ran a second copy over the same settings (now only one copy runs)
+- [x] Real-app E2E on the final layout (2026-11-26, Windows): `data`, `widget`, `limits`, `autorefresh`, `tray`, `basic`, `caps`, `projects`, `chat`, `attach`, `preview`, `probe`, `updater` all passed. Not run: `tools/update-install-test.mjs`
+- [x] Release build measured against the pre-revamp build (same machine, same data, four alternating runs): Home visible in about 1 s for both once warm; idle private memory about 173-177 MB before and 214-252 MB after, nearly all in WebView2's graphics process. Switching blur off after load did not reliably give it back, so the cause is not isolated. The owner accepted this for now
+- [ ] Not verified: clicking the real tray icon (left and right), where the panel appears and hiding on focus loss, the icon's look on the taskbar, and anything on macOS or Linux
 
 ## v0.1.0 release gate (owner decision, details in `docs/GOALS.md`)
 - [x] **In-app updater implemented and verified in the real app** (ADR 0003, `node tools/e2e.mjs updater`): signed updates, daily quiet check + manual check, release notes, progress, skip version; tampered / wrong-key / replayed installers rejected

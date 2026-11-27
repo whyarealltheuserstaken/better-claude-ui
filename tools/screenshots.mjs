@@ -102,6 +102,39 @@ for (const theme of themes) {
       await page.getByLabel("Position").selectOption("toolbar");
       await page.keyboard.press("Escape");
     });
+    // Parallel tool calls can ask several times at once. Stop must stay clickable, and every answer reachable.
+    await step("many-prompts", async () => {
+      await page.evaluate(async () => {
+        const { app } = await import("/src/lib/store.svelte.ts");
+        for (const n of [2, 3]) {
+          app.receive({ session_id: app.activeId, event: { type: "cli", event: { kind: "permission_request", request_id: "extra" + n, tool: "Write", input: { file_path: `C:\\demo\\project\\file-${n}.txt` }, description: "", tool_use_id: "extra-tool" + n } } });
+        }
+      });
+      await page.waitForTimeout(500);
+      const onTop = (el) => {
+        const r = el.getBoundingClientRect();
+        return r.bottom <= window.innerHeight && el.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2));
+      };
+      const stop = page.getByRole("button", { name: "Stop (Esc)" });
+      if (!(await stop.evaluate(onTop))) problems.push(`${theme} ${width}: Stop is off screen with three requests waiting`);
+      const allows = await page.getByRole("button", { name: "Allow", exact: true }).all();
+      if (allows.length < 3) problems.push(`${theme} ${width}: expected three requests, found ${allows.length}`);
+      for (const [i, allow] of allows.entries()) {
+        // Only a list the person can scroll counts: a clipped (overflow: hidden) box can be scrolled by script but not by hand.
+        const reachable = await allow.evaluate((el) => {
+          for (let box = el.parentElement; box; box = box.parentElement) {
+            if (/(auto|scroll)/.test(getComputedStyle(box).overflowY) && box.scrollHeight > box.clientHeight) {
+              box.scrollTop += el.getBoundingClientRect().bottom - box.getBoundingClientRect().bottom + 12;
+              break;
+            }
+          }
+          const r = el.getBoundingClientRect();
+          return r.top >= 0 && r.bottom <= window.innerHeight && el.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2));
+        });
+        if (!reachable) problems.push(`${theme} ${width}: Allow number ${i + 1} cannot be reached`);
+      }
+      if (!(await stop.evaluate(onTop))) problems.push(`${theme} ${width}: Stop moved off screen after scrolling the requests`);
+    });
     await page.close();
   }
 }
