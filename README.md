@@ -7,8 +7,8 @@ A lightweight desktop UI for [Claude Code](https://claude.com/claude-code): the 
 ## Screenshots
 | | |
 |---|---|
-| ![Home dashboard](docs/screenshots/home.png) | ![Usage and billing](docs/screenshots/usage.png) |
-| ![Terminal style](docs/screenshots/terminal-style.png) | ![Slash commands](docs/screenshots/slash-commands.png) |
+| ![A coding session asking for permission, with the usage widget](docs/screenshots/session.png) | ![Home with the message box](docs/screenshots/home.png) |
+| ![Usage and billing](docs/screenshots/usage.png) | ![Appearance settings](docs/screenshots/settings.png) |
 
 _(Screenshots use demo data.)_
 
@@ -18,7 +18,8 @@ _(Screenshots use demo data.)_
 - **Code and Chat modes** in one app.
 - **Experience tiers:** Beginner, Intermediate, Advanced.
 - **Usage and billing tracker:** tokens and estimated cost per day, model and project, plan allowance meters (5-hour and weekly), budgets and alerts.
-- **Home dashboard** with configurable widgets.
+- **Home dashboard** with a "What are we working on?" box and configurable widgets.
+- **Usage widget:** tokens, estimated cost and plan limits while you work, in the right panel, floating or in the toolbar, with an optional **system tray / menu bar** version that tells you when Claude is waiting. It never sends a request on its own.
 - **Projects** with standing instructions, **search** across conversations, **Ctrl+K command palette**, **web search in Chat**, **attachments**, slash commands, MCP/skills panels, CLAUDE.md and settings editors.
 - **Export and import your data:** back up everything, move between computers, or bring conversations from Claude.ai, ChatGPT and other assistants into a searchable Archive you can continue from. See [docs/EXPORT_FORMAT.md](docs/EXPORT_FORMAT.md).
 - **In-app updates:** signed updates only, checked quietly once a day (can be turned off), nothing installs without your click.

@@ -5,6 +5,15 @@ import Toolbar from "./Toolbar.svelte";
 const base = { title: "project", subtitle: "C:\demo\project", onsidebar: () => {}, onsearch: () => {} };
 
 describe("Toolbar", () => {
+  test("the sidebar button says when a hidden session is waiting, by name and by a mark", () => {
+    const { unmount } = render(Toolbar, { ...base, sidebarWaiting: true });
+    const button = screen.getByRole("button", { name: "Show or hide the sidebar. A session is waiting for you" });
+    expect(button.querySelector(".badge")?.textContent).toBe("!");
+    unmount();
+    render(Toolbar, base);
+    expect(screen.getByRole("button", { name: "Show or hide the sidebar" }).querySelector(".badge")).toBeNull();
+  });
+
   test("shows the title and folder, and every button is named", () => {
     render(Toolbar, { ...base, onexport: () => {}, onterminal: () => {}, onpanel: () => {} });
     expect(screen.getByRole("heading", { name: "project" })).toBeTruthy();

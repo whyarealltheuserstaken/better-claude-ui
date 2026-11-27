@@ -25,6 +25,22 @@ async function playTurn(id: string, text: string) {
   cli(id, { kind: "permission_request", request_id: "r" + counter, tool: "Write", input: { file_path: "C:\\demo\\project\\notes.txt", content: "hello" }, description: "notes.txt", tool_use_id: "t" + counter });
 }
 
+/** Sample numbers for the tray panel in a plain browser (graphite colours come from app.css). */
+export function mockTrayView() {
+  const day = { cost_usd: 2.41, input: 1200, output: 5400, cache_read: 88000, cache_write: 6100, turns: 6 };
+  const now = Math.floor(Date.now() / 1000);
+  return {
+    data: {
+      reply: null, session: null, sessionCost: null, hasSession: false, dailyBudget: 3, monthlyBudget: 60,
+      usage: { today: day, week: day, month: { ...day, cost_usd: 31.2 }, all: day, by_model: [], by_project: [], daily: [], days: 30 },
+      limits: { captured_at: Date.now() - 60000, status: "allowed", using_overage: false, windows: [{ name: "five_hour", utilization: 0.62, resets_at: now + 5400, status: "allowed" }, { name: "seven_day", utilization: 0.31, resets_at: now + 3 * 86400, status: "allowed" }] },
+    },
+    settings: { enabled: true },
+    vars: {},
+    status: "waiting",
+  };
+}
+
 const progressHandlers = new Set<(downloaded: number, total: number | null) => void>();
 export function mockUpdateProgress(h: (downloaded: number, total: number | null) => void): () => void {
   progressHandlers.add(h);
@@ -71,6 +87,9 @@ export async function mockInvoke<T>(cmd: string, args?: Record<string, unknown>)
         daily, days,
       } as T;
     }
+    case "tray_apply":
+    case "tray_update":
+      return undefined as T;
     case "usage_session":
       return { cost_usd: 0.42, input: 1200, output: 5400, cache_read: 88000, cache_write: 6100, turns: 6 } as T;
     case "usage_limits":

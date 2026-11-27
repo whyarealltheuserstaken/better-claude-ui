@@ -9,7 +9,7 @@
   import AutoRefresh from "./AutoRefresh.svelte";
   import BudgetFields from "./BudgetFields.svelte";
   import WidgetCustomize from "./WidgetCustomize.svelte";
-  import { sanitizeWidget } from "../widget/config";
+  import { type TraySettings, sanitizeTray, sanitizeWidget } from "../widget/config";
 
   let {
     config,
@@ -23,6 +23,7 @@
     onimport = () => {},
     limitsPaused = false,
     onautorefresh = () => {},
+    trayError = null,
     onsave,
     onback,
   }: {
@@ -37,6 +38,7 @@
     onimport?: () => void;
     limitsPaused?: boolean;
     onautorefresh?: (patch: { auto_refresh_limits?: boolean; refresh_limits_minutes?: number }) => void;
+    trayError?: string | null;
     onsave: (patch: Partial<AppConfig>) => void;
     onback: () => void;
   } = $props();
@@ -44,6 +46,10 @@
   const category = $derived(cleanCategory(config.settings_category));
   const title = $derived(CATEGORIES.find((c) => c.id === category)?.label ?? "General");
   const modes = $derived(PERMISSION_MODES.filter((m) => m.id !== "bypassPermissions" || config.tier === "advanced"));
+
+  const tray = $derived(sanitizeTray(config.tray));
+  /** Sanitized on the way out too, so turning the tray off also drops Keep running. */
+  const saveTray = (patch: Partial<TraySettings>) => onsave({ tray: sanitizeTray({ ...tray, ...patch }) });
 
   function setMode(select: HTMLSelectElement) {
     const v = select.value;
@@ -143,6 +149,26 @@
           <p>A small panel that shows tokens, estimated cost and plan limits while you work. It only reads what this app already has and never sends a request on its own.</p>
           <WidgetCustomize settings={sanitizeWidget(config.usage_widget)} onchange={(next) => onsave({ usage_widget: next })} />
         </section>
+        <section>
+          <h3>System tray / menu bar</h3>
+          <div class="list">
+            <label>
+              <input type="checkbox" checked={tray.enabled} onchange={(e) => saveTray({ enabled: e.currentTarget.checked })} />
+              <span class="text"><strong>Show in the system tray / menu bar</strong><small>An icon that tells you when Claude is waiting. Nothing can be approved from it.</small></span>
+            </label>
+            <label>
+              <input type="checkbox" checked={tray.keep_running} disabled={!tray.enabled} onchange={(e) => saveTray({ keep_running: e.currentTarget.checked })} />
+              <span class="text"><strong>Keep running when I close the window</strong><small>Off: closing the window quits. On: it hides, and the tray icon opens it again.</small></span>
+            </label>
+          </div>
+          {#if trayError}<p class="status bad" role="alert">{trayError}</p>{/if}
+        </section>
+        {#if tray.enabled}
+          <section>
+            <h3>Tray readings</h3>
+            <WidgetCustomize settings={tray} prefix="Tray: " listLabel="Tray readings" onchange={(next) => saveTray(next)} />
+          </section>
+        {/if}
       {:else if category === "data"}
         <section>
           <p>Move your conversations, projects and settings to another computer or another assistant, or bring them here.</p>

@@ -12,7 +12,7 @@
   import Backdrop from "$lib/components/Backdrop.svelte";
   import Toolbar from "$lib/components/Toolbar.svelte";
   import Icon from "$lib/ui/Icon.svelte";
-  import { PANEL_DOCK_MIN_WIDTH, panelState, waitingModes } from "$lib/shell";
+  import { PANEL_DOCK_MIN_WIDTH, panelState, waitingModes, waitingOutOfSight } from "$lib/shell";
   import Palette from "$lib/components/Palette.svelte";
   import { allStyles, allThemes } from "$lib/theme";
   import type { PaletteItem } from "$lib/palette";
@@ -41,7 +41,7 @@
   import MessageList from "$lib/components/MessageList.svelte";
   import PermissionPrompt from "$lib/components/PermissionPrompt.svelte";
   import SetupWizard from "$lib/components/SetupWizard.svelte";
-  import { applyAppearance, resolveStyle, resolveTheme } from "$lib/theme";
+  import { appearanceVars, applyAppearance, resolveStyle, resolveTheme } from "$lib/theme";
   import Sidebar from "$lib/components/Sidebar.svelte";
   import { app } from "$lib/store.svelte";
 
@@ -167,6 +167,20 @@
   $effect(() => {
     if (sessionKey) void app.refreshSessionUsage(sessionKey);
   });
+  const trayOn = $derived(app.tray.enabled);
+  const trayKeeps = $derived(app.tray.keep_running);
+  $effect(() => {
+    if (app.configLoaded) void app.applyTray(trayOn, trayKeeps);
+  });
+  $effect(() => {
+    const theme = resolveTheme(app.config.theme, app.config.custom_themes, systemDark);
+    const style = resolveStyle(app.config.style, app.config.custom_styles);
+    void app.syncPanel({ ...appearanceVars(theme, style), "color-scheme": theme.scheme });
+  });
+  // Reads the tray's status, so this runs again whenever it changes.
+  $effect(() => {
+    void app.syncTray();
+  });
   const waitingIds = $derived(new Set((app.active?.pending ?? []).map((p) => p.tool_use_id)));
   let transcript: ReturnType<typeof MessageList> | undefined = $state();
   function jump(id: string) {
@@ -267,6 +281,7 @@
         title={heading.title}
         subtitle={heading.subtitle}
         onsidebar={toggleSidebar}
+        sidebarWaiting={waitingOutOfSight(!!app.config.sidebar_hidden, app.view, app.activeId, app.states)}
         onsearch={() => (app.showPalette = true)}
         onexport={app.view === "session" && active && active.items.length > 0 ? () => app.exportActive() : undefined}
         onterminal={app.view === "session" && active && active.items.length > 0 ? () => app.openTerminal() : undefined}
@@ -328,6 +343,7 @@
           onimport={() => (app.showImport = true)}
           limitsPaused={app.limitsPaused}
           onautorefresh={(p) => app.setAutoRefresh(p)}
+          trayError={app.trayError}
           onsave={(patch) => app.updateConfig(patch)}
           onback={() => app.back()}
         />
@@ -389,9 +405,14 @@
         {/if}
         <div class="dock">
           <div class="column">
-            {#each active.pending as p (p.request_id)}
-              <PermissionPrompt request={p} onresolve={(id, d) => app.resolve(id, d)} />
-            {/each}
+            {#if active.pending.length > 0}
+              <!-- Several can wait at once: they scroll, so the message box and Stop stay on screen. -->
+              <div class="prompts">
+                {#each active.pending as p (p.request_id)}
+                  <PermissionPrompt request={p} onresolve={(id, d) => app.resolve(id, d)} />
+                {/each}
+              </div>
+            {/if}
             <Composer status={active.status} {glyph} commands={active.info ? active.info.commands.map((c) => c.name) : (active.caps?.slash_commands ?? [])} descriptions={Object.fromEntries((active.info?.commands ?? []).map((c) => [c.name, c.description]))} onsend={(t, a) => app.send(t, a)} oninterrupt={() => app.interrupt()}>
               {#snippet controls()}
                 {#if panel === "closed"}{@render sessionControls("composer")}{/if}
@@ -589,6 +610,10 @@
   }
   .dock {
     padding: 0 24px 18px;
+  }
+  .prompts {
+    max-height: 38vh;
+    overflow-y: auto;
   }
   .column {
     /* Above the floating widget (10), below dialogs (12): it can never hide Allow, Deny or Send. */

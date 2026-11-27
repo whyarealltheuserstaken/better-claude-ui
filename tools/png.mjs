@@ -20,6 +20,21 @@ function chunk(type, data) {
   return Buffer.concat([len, td, crc]);
 }
 
+/** A size x size PNG with transparency; pixel(x, y) returns [r, g, b, a]. */
+export function rgbaPng(size, pixel) {
+  const row = size * 4 + 1;
+  const raw = Buffer.alloc(row * size);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) raw.set(pixel(x, y), y * row + 1 + x * 4);
+  }
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(size, 0);
+  ihdr.writeUInt32BE(size, 4);
+  ihdr[8] = 8;
+  ihdr[9] = 6;
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk("IHDR", ihdr), chunk("IDAT", zlib.deflateSync(raw)), chunk("IEND", Buffer.alloc(0))]);
+}
+
 /** A size x size PNG filled with [r, g, b]. */
 export function solidPng([r, g, b], size = 64) {
   const row = size * 3 + 1;

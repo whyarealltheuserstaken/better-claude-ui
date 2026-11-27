@@ -1,6 +1,6 @@
 // End-to-end test of the REAL app against the REAL `claude` CLI, driven over WebView2's debug port.
 // Windows: starts `npm run tauri dev` itself. Usage: node tools/e2e.mjs
-// Scenarios: `node tools/e2e.mjs` (permission flow, default), `attach` (image + text attachments in Chat), `caps` (slash menu, capabilities panel, CLAUDE.md editor), `chat` (palette, web search in Chat, tool lockdown, export), `projects` (project instructions applied to a chat, conversation search), `autorefresh` (timer-driven refresh, nothing clicked; THROWAWAY profile), `limits` (stale allowance snapshot, reset window, live Refresh; THROWAWAY profile), `data` (export, import of Claude.ai/ChatGPT/Markdown files, archive, continue in a new chat; runs in a THROWAWAY profile), `widget` (live token counts in the usage widget, two short Haiku replies; THROWAWAY profile), `updater` (in-app updater against a local signed test server; never installs anything).
+// Scenarios: `node tools/e2e.mjs` (permission flow, default), `attach` (image + text attachments in Chat), `caps` (slash menu, capabilities panel, CLAUDE.md editor), `chat` (palette, web search in Chat, tool lockdown, export), `projects` (project instructions applied to a chat, conversation search), `autorefresh` (timer-driven refresh, nothing clicked; THROWAWAY profile), `limits` (stale allowance snapshot, reset window, live Refresh; THROWAWAY profile), `data` (export, import of Claude.ai/ChatGPT/Markdown files, archive, continue in a new chat; runs in a THROWAWAY profile), `widget` (live token counts in the usage widget, two short Haiku replies; THROWAWAY profile), `tray` (close to tray, a permission request while hidden, the panel's limits, quit confirmation; one Haiku request, THROWAWAY profile), `updater` (in-app updater against a local signed test server; never installs anything).
 // Uses your claude login (a few cents of tokens). Exits non-zero on failure.
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, rmSync, readFileSync } from "node:fs";
@@ -83,6 +83,17 @@ if (scenario === "widget") {
   process.env.BCU_CONFIG_DIR = widgetProfile; // debug-only override: the real profile is never touched
 }
 
+let trayProfile = null;
+if (scenario === "tray") {
+  const { writeFileSync } = await import("node:fs");
+  trayProfile = join(tmpdir(), `bcu-e2e-tray-${process.pid}`);
+  rmSync(trayProfile, { recursive: true, force: true });
+  mkdirSync(trayProfile, { recursive: true });
+  writeFileSync(join(trayProfile, "config.json"), JSON.stringify({ onboarded: true, tier: "intermediate", auto_update_check: false, default_model: "haiku", tray: { enabled: true, keep_running: true } }));
+  process.env.BCU_CONFIG_DIR = trayProfile; // debug-only override: the real profile is never touched
+  process.env.BCU_OPEN_TRAY_PANEL = "1"; // debug-only: opens the panel, since nothing here can click the icon
+}
+
 let updateServer = null;
 if (scenario === "updater") {
   updateServer = await startUpdateServer({ port: 9488, realArtifact: process.env.BCU_REAL_ARTIFACT ?? null, replayArtifact: process.env.BCU_REPLAY_ARTIFACT ?? null });
@@ -138,6 +149,97 @@ try {
   step("Home visible, CLI detected");
   // Ask the app itself: where the version is shown depends on the Home layout the user has chosen.
   await page.waitForFunction(async () => { const { app } = await import("/src/lib/store.svelte.ts"); return app.cli?.state === "found"; });
+
+  if (scenario === "tray") {
+    const expect = (cond, msg) => { if (!cond) throw new Error(msg); };
+    const { execFileSync } = await import("node:child_process");
+    const ps = (script) => execFileSync("powershell", ["-NoProfile", "-Command", script], { encoding: "utf8" }).trim();
+    // Native window calls. A title alone is NOT enough: Explorer owns helper windows with the app's
+    // title, so only a window belonging to the app's own process is ever looked at or messaged.
+    const native = (title, call) => ps(`Add-Type -Namespace E2E -Name Win -MemberDefinition '[DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern System.IntPtr FindWindowEx(System.IntPtr p, System.IntPtr a, string c, string t); [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(System.IntPtr h, out uint pid); [DllImport("user32.dll")] public static extern bool IsWindowVisible(System.IntPtr h); [DllImport("user32.dll")] public static extern bool PostMessage(System.IntPtr h, uint m, System.IntPtr w, System.IntPtr l);'; $own = @(Get-Process better-claude-ui -ErrorAction SilentlyContinue | ForEach-Object Id); $h = [System.IntPtr]::Zero; $found = [System.IntPtr]::Zero; while (($h = [E2E.Win]::FindWindowEx([System.IntPtr]::Zero, $h, [NullString]::Value, '${title}')) -ne [System.IntPtr]::Zero) { $owner = [uint32]0; [void][E2E.Win]::GetWindowThreadProcessId($h, [ref]$owner); if ($own -contains [int]$owner) { $found = $h; break } }; if ($found -eq [System.IntPtr]::Zero) { 'missing' } else { $h = $found; ${call} }`);
+    const visible = (title) => native(title, "[E2E.Win]::IsWindowVisible($h)");
+    const closeWindow = (title) => native(title, "[E2E.Win]::PostMessage($h, 16, [System.IntPtr]::Zero, [System.IntPtr]::Zero)");
+    const running = () => Number(ps("@(Get-Process better-claude-ui -ErrorAction SilentlyContinue).Count"));
+    const store = (fn, arg) => page.evaluate(`(async (arg) => { const { app } = await import("/src/lib/store.svelte.ts"); return (${fn})(app, arg); })(${JSON.stringify(arg ?? null)})`);
+    const until = async (what, check) => {
+      for (let i = 0; i < 200; i++) {
+        if (await check()) return;
+        await new Promise((r) => setTimeout(r, 300));
+      }
+      throw new Error("timed out waiting: " + what);
+    };
+
+    await until("the tray icon", () => store("(app) => app.trayReady"));
+    expect((await store("(app) => app.trayError")) === null, "the tray reported an error");
+    step("tray icon created");
+
+    let panel;
+    await until("the tray panel page", () => (panel = browser.contexts().flatMap((c) => c.pages()).find((p) => new URL(p.url()).pathname === "/tray")));
+    const panelText = () => panel.evaluate(() => document.body.innerText.replace(/\s+/g, " "));
+    await until("readings in the panel", async () => (await panelText()).includes("5-hour limit"));
+    step("panel shows: " + (await panelText()));
+    for (const cmd of ["get_config", "resolve_permission"]) {
+      const answer = await panel.evaluate(async (c) => {
+        try { await window.__TAURI_INTERNALS__.invoke(c, { requestId: "x", decision: "allow" }); return "allowed"; } catch (e) { return String(e); }
+      }, cmd);
+      expect(answer === "This window can't do that.", `the panel could call ${cmd}: ${answer}`);
+    }
+    step("the panel cannot call the app's commands");
+    const press = (name) => panel.evaluate((n) => [...document.querySelectorAll("button")].find((b) => b.textContent.trim() === n).click(), name);
+
+    expect(visible("BetterClaudeUI") === "True", "the main window should start visible");
+    closeWindow("BetterClaudeUI");
+    await new Promise((r) => setTimeout(r, 2500));
+    expect(running() === 1, "the app quit although Keep running is on");
+    expect(visible("BetterClaudeUI") === "False", "the window did not hide");
+    step("closing with Keep running on hid the window; the app is still running");
+
+    // Starting the app again (Start menu) must bring this one back, not run a second copy over the same settings.
+    // Same WebView2 arguments as the first copy: with different ones WebView2 refuses to start it at all.
+    const second = spawn(join(process.cwd(), "src-tauri", "target", "debug", "better-claude-ui.exe"), [], { stdio: "ignore", env: { ...process.env, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${PORT}` } });
+    for (let i = 0; i < 50 && second.exitCode === null; i++) await new Promise((r) => setTimeout(r, 300));
+    expect(second.exitCode !== null, "starting the app again left a second copy running");
+    expect(running() === 1, "expected exactly one copy, found " + running());
+    await until("the hidden window to come back", () => visible("BetterClaudeUI") === "True");
+    step("starting the app again closed the new copy and showed the window");
+    closeWindow("BetterClaudeUI");
+    await until("the window to hide again", () => visible("BetterClaudeUI") === "False");
+
+    await store("async (app, cwd) => { app.mode = 'code'; await app.newSession({ cwd }); await app.send('Use the Write tool to create hello.txt containing the word hi. Do nothing else.'); }", work);
+    await until("a permission request while hidden", () => store("(app) => (app.active?.pending.length ?? 0) > 0"));
+    await until("the tray being told while hidden", () => store("(app) => String(app.traySent).includes('\"waiting\":true')"));
+    await until("the panel saying Claude is waiting", async () => (await panelText()).includes("Claude is waiting for you"));
+    expect(!existsSync(join(work, "hello.txt")), "the file was written without approval");
+    const buttons = await panel.evaluate(() => [...document.querySelectorAll("button")].map((b) => b.textContent.trim() || b.getAttribute("aria-label")));
+    expect(!buttons.some((b) => /allow|approve|deny/i.test(b)), "the panel offers a permission button: " + buttons.join(", "));
+    step("while hidden: permission waiting reached the tray and the panel, which cannot approve it");
+
+    await press("Quit");
+    await until("the quit question", () => native("Quit BetterClaudeUI?", "'found'") === "found");
+    expect(running() === 1, "the app quit without asking while Claude was waiting");
+    closeWindow("Quit BetterClaudeUI?");
+    await new Promise((r) => setTimeout(r, 1500));
+    expect(running() === 1, "dismissing the question still quit the app");
+    step("Quit while waiting asked first; dismissing it kept the app running");
+
+    await press("Open BetterClaudeUI");
+    await until("the window to come back", () => visible("BetterClaudeUI") === "True");
+    step("Open in the panel showed the window again");
+    await store("async (app) => app.resolve(app.active.pending[0].request_id, 'deny')");
+    await until("the reply to finish", () => store("(app) => app.active.status !== 'running' && app.active.pending.length === 0"));
+    expect(!existsSync(join(work, "hello.txt")), "the denied file exists");
+    if (shots) await page.screenshot({ path: join(shots, "tray-main.png") });
+    await tidy();
+
+    await store("async (app) => app.updateConfig({ tray: { ...app.tray, keep_running: false } })");
+    await new Promise((r) => setTimeout(r, 1500));
+    closeWindow("BetterClaudeUI");
+    await until("the app to quit", () => running() === 0);
+    step("closing with Keep running off quit the app, hidden panel and all");
+    console.log("E2E TRAY PASSED");
+    cleanup(0);
+    await new Promise(() => {});
+  }
 
   if (scenario === "widget") {
     const expect = (cond, msg) => { if (!cond) throw new Error(msg); };
@@ -442,7 +544,7 @@ try {
   if (scenario === "updater") {
     const before = await page.evaluate(async () => {
       const { app } = await import("/src/lib/store.svelte.ts");
-      const c = { auto_update_check: app.config.auto_update_check, last_update_check: app.config.last_update_check, skipped_version: app.config.skipped_version };
+      const c = { auto_update_check: app.config.auto_update_check, last_update_check: app.config.last_update_check, skipped_version: app.config.skipped_version, settings_category: app.config.settings_category };
       await app.updateConfig({ auto_update_check: false, skipped_version: null }); // keep the run deterministic
       return c;
     });
