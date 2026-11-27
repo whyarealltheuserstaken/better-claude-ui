@@ -118,6 +118,14 @@ pub fn apply(app: &AppHandle, enabled: bool, keep_running: bool) -> Result<(), S
     if enabled && !existing {
         let menu = create(app).map_err(|e| format!("The tray icon couldn't be created: {e}"))?;
         lock(app).menu = Some(menu);
+        // Debug builds only: a test cannot click a tray icon, so it asks for the panel this way.
+        #[cfg(debug_assertions)]
+        if std::env::var_os("BCU_OPEN_TRAY_PANEL").is_some() {
+            let app = app.clone();
+            std::thread::spawn(move || {
+                let _ = toggle_panel(&app, PhysicalPosition::new(1.0, 1.0), Rect::default());
+            });
+        }
     } else if !enabled && existing {
         app.remove_tray_by_id(ID);
         lock(app).menu = None;
@@ -246,7 +254,7 @@ fn toggle_panel(app: &AppHandle, click: PhysicalPosition<f64>, icon: Rect) -> ta
     let panel = match app.get_webview_window(PANEL) {
         Some(panel) => panel,
         None => WebviewWindowBuilder::new(app, PANEL, WebviewUrl::App("tray".into()))
-            .title("BetterClaudeUI")
+            .title("BetterClaudeUI usage")
             .inner_size(PANEL_W, PANEL_H)
             .resizable(false)
             .maximizable(false)
