@@ -2,7 +2,7 @@
 
 Releases are built by `.github/workflows/release.yml` when a tag like `v0.1.0` is pushed.
 
-> **v0.1.0 is gated** (owner decision): do not tag it until the in-app updater and the owner's extra features are done. See `docs/GOALS.md`. The updater also changes this process: once it exists, every release must be signed with the updater key (stored as GitHub secrets) and publish the updater JSON.
+> Publishing is the owner's call: do not push a `v*` tag without their go-ahead. Every release must be signed with the updater key (stored as GitHub secrets) and publish the updater JSON.
 
 ## One-time setup: updater signing (needs the repository owner)
 The in-app updater only installs updates signed with the project's key (ADR 0003).
