@@ -29,7 +29,7 @@ _(Screenshots use demo data.)_
 - **Extensible:** features, presets and themes are modules/data files (see `docs/EXTENDING.md`).
 
 ## Download
-Get the installer for your system from the [latest release](https://github.com/whyarealltheuserstaken/better-claude-ui/releases/latest). On Windows use the `-setup.exe` file. The installers are not code-signed: on Windows SmartScreen choose "More info", then "Run anyway"; on macOS right-click the app and choose "Open".
+Get the installer for your system from the [latest release](https://github.com/whyarealltheuserstaken/betterclaudeui/releases/latest). On Windows use the `-setup.exe` file. The installers are not code-signed: on Windows SmartScreen choose "More info", then "Run anyway"; on macOS right-click the app and choose "Open".
 
 ## Status
 0.1.0 is the first release. Windows is the tested platform; macOS and Linux builds pass CI but have not been run on real hardware. Updates are signed and checked by the app; the installers themselves are not code-signed. See [`docs/RELEASING.md`](docs/RELEASING.md).

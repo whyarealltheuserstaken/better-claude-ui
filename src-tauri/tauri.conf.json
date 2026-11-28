@@ -41,7 +41,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDhBRTMyMjIzODk5MThFMUQKUldRZGpwR0pJeUxqaWdjekNaOSt3cXZvWjF0UTIwNXJUandxVitUZlZLcjZ4U3VGd2ZCYXJtWXgK",
       "endpoints": [
-        "https://github.com/whyarealltheuserstaken/better-claude-ui/releases/latest/download/latest.json"
+        "https://github.com/whyarealltheuserstaken/betterclaudeui/releases/latest/download/latest.json"
       ],
       "windows": {
         "installMode": "passive"

@@ -2,7 +2,9 @@
 
 _Last updated: 2026-11-27 · Written so a fresh Claude Code session on another machine can resume cold._
 
-> **v0.1.0 is published** (2026-11-27, https://github.com/whyarealltheuserstaken/better-claude-ui/releases/tag/v0.1.0). The release gate is closed. Statements further down that say it is unreleased or gated, or that the release workflow never ran, are history. **Next:** owner-chosen features for a later version; an off-machine copy of the updater key (now urgent, because installed copies depend on it); and on the next release, check that an installed 0.1.0 updates from the published `latest.json`. Releases are still the owner's call. The workflow warns that `actions/checkout@v4` and `actions/setup-node@v4` target the deprecated Node 20.
+> **v0.1.0 is published** (2026-11-27, https://github.com/whyarealltheuserstaken/betterclaudeui/releases/tag/v0.1.0). The release gate is closed. Statements further down that say it is unreleased or gated, or that the release workflow never ran, are history. **Next:** owner-chosen features for a later version; an off-machine copy of the updater key (now urgent, because installed copies depend on it); and on the next release, check that an installed 0.1.0 updates from the published `latest.json`. Releases are still the owner's call. The workflow warns that `actions/checkout@v4` and `actions/setup-node@v4` target the deprecated Node 20.
+>
+> **Repo renamed** to `betterclaudeui` (2026-11-27). Installed 0.1.0 copies still check the old `better-claude-ui` update address, which works through GitHub's redirect. **Never create a new repo named `better-claude-ui` on this account**: it would break their updates. Internal names (program file, app data folder, app identifier) keep their old spelling on purpose.
 
 **Read order for a new session:** this file → `docs/GOALS.md` (what to build next; **v0.1.0 is gated on the in-app updater**) → `docs/PROGRESS.md` → `docs/superpowers/specs/2026-11-24-better-claude-ui-design.md` (approved design) → `docs/superpowers/plans/` (plans) → `docs/PROTOCOL.md` (CLI protocol facts) → `docs/ARCHITECTURE.md`.
 
@@ -10,7 +12,7 @@ _Last updated: 2026-11-27 · Written so a fresh Claude Code session on another m
 
 ## 1. What this project is, and the owner's expectations
 
-**BetterClaudeUI** (repo `whyarealltheuserstaken/better-claude-ui`, public, MIT, unofficial) is a lightweight desktop app that wraps the real `claude` CLI so the owner gets *all* of Claude Code's power with a far better UI than a terminal. It is a custom launcher, not a reimplementation.
+**BetterClaudeUI** (repo `whyarealltheuserstaken/betterclaudeui`, public, MIT, unofficial) is a lightweight desktop app that wraps the real `claude` CLI so the owner gets *all* of Claude Code's power with a far better UI than a terminal. It is a custom launcher, not a reimplementation.
 
 What the owner asked for, in their own terms:
 - Full Claude Code CLI functionality, better UX/UI than a terminal. They are going to use Claude and Claude Code heavily.
@@ -20,7 +22,7 @@ What the owner asked for, in their own terms:
 - **Very light** (hence Rust + Tauri, not Electron).
 - **All platforms**: Windows 10/11, macOS Intel + Apple Silicon (universal build), Linux. Windows first.
 - Open source on GitHub with a real development structure, **room for future add-ons**, and a good **handoff + progress tracker** for developing the app itself.
-- Name: `BetterClaudeUI` / repo `better-claude-ui` (chosen for search discoverability; the owner accepted the small trademark risk of "Claude" in the name).
+- Name: `BetterClaudeUI` / repo `betterclaudeui` (originally `better-claude-ui`; chosen for search discoverability; the owner accepted the small trademark risk of "Claude" in the name).
 - Their question "does the CLI have an edge over Claude Desktop's Code mode?": answered yes, mostly (new features land in the CLI first, it is scriptable, fuller configuration). Don't overclaim specifics; verify.
 
 **How the owner wants you to work (working agreements):**
@@ -241,5 +243,5 @@ The parser, broker and registry were written test-first with a RED run observed.
 ## 12. Setting up on a new machine
 1. Install Node 20+, Rust (rustup, MSVC on Windows), Tauri prerequisites, git, the `claude` CLI; run `claude` once to log in.
 2. Install the same Claude Code plugins (`superpowers`, `frontend-design`); the owner's personal memory/config does **not** travel with the repo, which is why working agreements are written above.
-3. `git clone https://github.com/whyarealltheuserstaken/better-claude-ui && cd better-claude-ui && npm install`, then run the commands in §4 to confirm a green baseline before changing anything.
+3. `git clone https://github.com/whyarealltheuserstaken/betterclaudeui && cd betterclaudeui && npm install`, then run the commands in §4 to confirm a green baseline before changing anything.
 4. Update this file and `docs/PROGRESS.md` at the end of every session.
