@@ -28,8 +28,11 @@ _(Screenshots use demo data.)_
 - **Multi-agent presets:** Coordinator + Workers, Deep Research, Code + Review.
 - **Extensible:** features, presets and themes are modules/data files (see `docs/EXTENDING.md`).
 
+## Download
+Get the installer for your system from the [latest release](https://github.com/whyarealltheuserstaken/better-claude-ui/releases/latest). On Windows use the `-setup.exe` file. The installers are not code-signed: on Windows SmartScreen choose "More info", then "Run anyway"; on macOS right-click the app and choose "Open".
+
 ## Status
-Pre-release (0.1.0 candidate, not published yet: a few more features come first, see [`docs/GOALS.md`](docs/GOALS.md)). The in-app updater is built and verified on Windows. Windows is the tested platform; macOS and Linux builds pass CI but have not been run on real hardware. Installers are unsigned. See [`docs/RELEASING.md`](docs/RELEASING.md).
+0.1.0 is the first release. Windows is the tested platform; macOS and Linux builds pass CI but have not been run on real hardware. Updates are signed and checked by the app; the installers themselves are not code-signed. See [`docs/RELEASING.md`](docs/RELEASING.md).
 
 Roadmap and current state: See [`docs/PROGRESS.md`](docs/PROGRESS.md) for the roadmap and [`docs/HANDOFF.md`](docs/HANDOFF.md) for the current state.
 

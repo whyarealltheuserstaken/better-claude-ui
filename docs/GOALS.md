@@ -2,7 +2,11 @@
 
 The single place for "what must happen before the first release, and what comes next". Owner decisions are marked **(owner)**. Keep this file current: move items to `docs/PROGRESS.md` when they are done.
 
-## v0.1.0 release gate (owner decision, 2026-11-25)
+## v0.1.0 release gate (closed 2026-11-27)
+
+The owner asked for the first release on 2026-11-27, which lifts the gate below. The extra features (item 2) were never listed, so they move to a later version. The off-machine key copy is still open.
+
+The original gate (owner decision, 2026-11-25), kept for history:
 
 **Do not tag or publish v0.1.0 until every item below is done.** The app itself is otherwise feature-complete (see `docs/HANDOFF.md` section 3).
 

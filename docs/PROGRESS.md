@@ -36,13 +36,13 @@ Legend: [x] done · [~] in progress · [ ] todo
 - [x] Release build measured against the pre-revamp build (same machine, same data, four alternating runs): Home visible in about 1 s for both once warm; idle private memory about 173-177 MB before and 214-252 MB after, nearly all in WebView2's graphics process. Switching blur off after load did not reliably give it back, so the cause is not isolated. The owner accepted this for now
 - [ ] Not verified: clicking the real tray icon (left and right), where the panel appears and hiding on focus loss, the icon's look on the taskbar, and anything on macOS or Linux
 
-## v0.1.0 release gate (owner decision, details in `docs/GOALS.md`)
+## v0.1.0 release (gate lifted by the owner 2026-11-27, details in `docs/GOALS.md`)
 - [x] **In-app updater implemented and verified in the real app** (ADR 0003, `node tools/e2e.mjs updater`): signed updates, daily quiet check + manual check, release notes, progress, skip version; tampered / wrong-key / replayed installers rejected
 - [x] Updater: GitHub signing secrets added; real install-and-relaunch verified on Windows (0.1.0 to 0.1.1, relaunched)
 - [x] Updater: protected local key backup in place and machine-verified (`node tools/check-updater-key.mjs`)
 - [ ] Updater: an off-machine copy of the key (owner to choose where)
-- [ ] UI and UX revamp (spec: `docs/superpowers/specs/2026-11-26-ui-revamp-design.md`)
-- [ ] A few more features, defined by the owner, after the revamp (list in `docs/GOALS.md`, currently empty)
+- [x] UI and UX revamp (spec: `docs/superpowers/specs/2026-11-26-ui-revamp-design.md`)
+- Extra owner-chosen features: moved to a later version (none were listed)
 - [ ] Then tag and publish v0.1.0 (see the last item of M5 below)
 
 ## M0/M1 — Foundation & core Code mode (plan: `docs/superpowers/plans/2026-11-24-m0-m1-core-foundation.md`)
