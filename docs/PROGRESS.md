@@ -43,7 +43,7 @@ Legend: [x] done · [~] in progress · [ ] todo
 - [ ] Updater: an off-machine copy of the key (owner to choose where)
 - [x] UI and UX revamp (spec: `docs/superpowers/specs/2026-11-26-ui-revamp-design.md`)
 - Extra owner-chosen features: moved to a later version (none were listed)
-- [ ] Then tag and publish v0.1.0 (see the last item of M5 below)
+- [x] v0.1.0 tagged, built and published 2026-11-27: all six signatures verified against the app's public key, public `latest.json` reachable, and the release `setup.exe` installed, opened with no page errors and uninstalled (Windows). Not run: the MSI, macOS and Linux files, and an update from the published release (needs a later version)
 
 ## M0/M1 — Foundation & core Code mode (plan: `docs/superpowers/plans/2026-11-24-m0-m1-core-foundation.md`)
 - [x] T1 Repo, scaffold, CI, docs
@@ -110,6 +110,6 @@ Legend: [x] done · [~] in progress · [ ] todo
 - [x] Strict production CSP (ADR 0002); release build verified: NSIS 1.63 MB, MSI 2.35 MB, UI renders with zero CSP/console errors
 - [x] README screenshots (docs/screenshots, demo data)
 - [x] Idle RAM re-measured: ~157 MB (7 processes); the <100 MB target is not achievable with WebView2 and is retired
-- [x] Release workflow + docs/RELEASING.md written (never run)
-- [ ] Tag and publish v0.1.0 (owner decision; **blocked on the release gate at the top of this file**)
+- [x] Release workflow + docs/RELEASING.md written (first run 2026-11-27, passed on all three systems)
+- [x] Tag and publish v0.1.0 (2026-11-27)
 - [ ] M6 macOS (universal) + Linux release artifacts
