@@ -1,6 +1,8 @@
 # Handoff
 
-_Last updated: 2026-11-25 (end of session 2) · Written so a fresh Claude Code session on another machine can resume cold._
+_Last updated: 2026-11-27 · Written so a fresh Claude Code session on another machine can resume cold._
+
+> **v0.1.0 is published** (2026-11-27, https://github.com/whyarealltheuserstaken/better-claude-ui/releases/tag/v0.1.0). The release gate is closed. Statements further down that say it is unreleased or gated, or that the release workflow never ran, are history. **Next:** owner-chosen features for a later version; an off-machine copy of the updater key (now urgent, because installed copies depend on it); and on the next release, check that an installed 0.1.0 updates from the published `latest.json`. Releases are still the owner's call. The workflow warns that `actions/checkout@v4` and `actions/setup-node@v4` target the deprecated Node 20.
 
 **Read order for a new session:** this file → `docs/GOALS.md` (what to build next; **v0.1.0 is gated on the in-app updater**) → `docs/PROGRESS.md` → `docs/superpowers/specs/2026-11-24-better-claude-ui-design.md` (approved design) → `docs/superpowers/plans/` (plans) → `docs/PROTOCOL.md` (CLI protocol facts) → `docs/ARCHITECTURE.md`.
 
